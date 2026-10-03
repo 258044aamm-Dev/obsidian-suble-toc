@@ -70,8 +70,10 @@ groups that start closed.
 
 ### Advanced
 
-Reached from the **Advanced** entry at the bottom of the settings page, grouped
-into four collapsible sections.
+Reached from the **Advanced** entry at the bottom of the settings page. The rest
+of the settings are grouped into four collapsible rows — **Content**,
+**Appearance**, **Minimap** and **Behavior** — each with a one-line description
+and a caret on the right-hand side that folds its settings away.
 
 **Content**
 

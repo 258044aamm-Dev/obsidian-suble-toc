@@ -741,34 +741,74 @@
 	background-color: var(--background-secondary);
 }
 
-/* Obsidian's mobile stylesheet lays a settings row out as a column -- name on
-   top, control beneath, flush left -- and only switches back to a horizontal
-   row for rows carrying a control modifier class (toggle, dropdown, slider).
-   A header row is a `render` definition with no control, so it got no
-   modifier class and fell through to the stacked default, putting the caret
-   under the title and leaving a tall band of dead space beneath it.
+/* The row's interior is ours. Obsidian lays a settings row out itself -- as a
+   flex row on desktop, as a column on mobile -- and the two slots it offers
+   for content (`infoEl`, `controlEl`) are siblings, so it is the host's layout
+   that decides where each one lands. That is what put the caret under the
+   title, flush left, and why restating the row's own direction never stuck:
+   the layout being corrected belongs to someone else.
 
-   So the layout is stated here instead of inherited. Both selectors are
-   compounded with `.setting-item` so they outrank `body.is-mobile
-   .setting-item` on specificity rather than relying on stylesheet order or
-   `!important`. Everything is scoped to the plugin's own header class: no
-   other settings row, Obsidian's or another plugin's, can match. */
-.subtle-toc-settings-group-header.setting-item,
-body.is-mobile .subtle-toc-settings-group-header.setting-item {
+   So the row carries one child of our own instead -- `head`, built in
+   settings.ts -- and lays that out here. Whatever the host does to the row it
+   has a single box to place, so no direction it stacks in can separate the
+   title from the caret. */
+.subtle-toc-settings-group-head {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: nowrap;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--size-4-2, 8px);
+	/* Stated, so a host that centres, stacks or left-aligns its children
+	   cannot shrink or offset the row's content; `min-width: 0` so a long
+	   title ellipsises rather than pushing the caret off the line. */
+	width: 100%;
+	min-width: 0;
+	align-self: stretch;
 }
 
-.subtle-toc-settings-group-header .setting-item-info,
-body.is-mobile .subtle-toc-settings-group-header .setting-item-info {
+/* Core's own name/desc and control boxes: left in place, taken out of the
+   layout. Emptying them instead would be a smaller change, but they are
+   Obsidian's markup and the framework pokes at them on re-render, so they
+   stay -- unrendered -- and everything visible lives in `head`. */
+.subtle-toc-settings-group-header > .setting-item-info,
+.subtle-toc-settings-group-header > .setting-item-control {
+	display: none;
+}
+
+.subtle-toc-settings-group-text {
 	flex: 1 1 auto;
-	/* Let a long title ellipsis rather than force the caret onto a new line. */
 	min-width: 0;
-	margin-right: 0;
+}
+
+/* Match the weight of a navigation row rather than a section title. */
+.subtle-toc-settings-group-title {
+	font-weight: var(--font-medium);
+}
+
+.subtle-toc-settings-group-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+}
+
+/* The caret's slot: last in the row, pushed to the right, never shrunk. */
+.subtle-toc-settings-group-caret {
+	flex: 0 0 auto;
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+}
+
+/* The chevron is decorative here -- the whole row is the target -- so the
+   44px touch target Obsidian gives a mobile `.clickable-icon` is neutralised
+   inside this row only. The row keeps its own 44px minimum below. */
+.subtle-toc-settings-group-caret .clickable-icon {
+	width: auto;
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding: 2px;
 }
 
 .subtle-toc-settings-group-header:hover {
@@ -779,20 +819,6 @@ body.is-mobile .subtle-toc-settings-group-header .setting-item-info {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
 	border-radius: var(--radius-s);
-}
-
-/* Match the weight of a navigation row rather than a section title. */
-.subtle-toc-settings-group-header .setting-item-name {
-	font-weight: var(--font-medium);
-}
-
-/* The chevron is decorative here -- the whole row is the target. `width:auto`
-   neutralises the full-width control Obsidian gives a stacked mobile row. */
-.subtle-toc-settings-group-header .setting-item-control,
-body.is-mobile .subtle-toc-settings-group-header .setting-item-control {
-	flex: 0 0 auto;
-	width: auto;
-	margin: 0;
 }
 
 /* Scoped to the list element Obsidian hands us, and matching descendants

@@ -51,6 +51,19 @@ const GROUP_LABELS: Record<GroupId, string> = {
 };
 
 /**
+ * One line per group saying what is inside it, drawn under the group title.
+ *
+ * Kept beside the labels so a group's title and its description are declared
+ * together, and mirrored into the definition's `desc` -- see headerRow.
+ */
+const GROUP_DESCRIPTIONS: Record<GroupId, string> = {
+	content: "Bullets, callouts, task statuses, heading levels.",
+	appearance: "Text clean-up, wrapping, folding, popover width.",
+	minimap: "Marker size and spacing, task count on the edge.",
+	behavior: "Close delay, smooth scroll, hover preview.",
+};
+
+/**
  * The settings tab.
  *
  * Built on the declarative API Obsidian 1.13 introduced: `getSettingDefinitions()`
@@ -130,10 +143,15 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 	 * declarative `heading` field was used here first, but that is the
 	 * section-heading primitive: larger, bolder and spaced as a divider, so it
 	 * read as a stack of titles rather than a list of rows.
+	 *
+	 * `desc` mirrors the line the row draws under its title, so the definition
+	 * and the row stay one source of truth. It is not written into the
+	 * framework's own description box: wireHeaderRow draws the row itself.
 	 */
 	private headerRow(id: GroupId): SettingDefinition {
 		return {
 			name: GROUP_LABELS[id],
+			desc: GROUP_DESCRIPTIONS[id],
 			// An affordance rather than a setting, so keep it out of search.
 			searchable: false,
 			render: (setting, group) => this.wireHeaderRow(setting, group, id),
@@ -143,16 +161,43 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 	/**
 	 * Make a header row collapse its group.
 	 *
-	 * Both elements this needs are handed over by the API — `settingEl` is the
-	 * row and `listEl` is the container holding the group's items — so unlike
-	 * the first attempt there is no walking up the DOM guessing which ancestor
-	 * is which.
+	 * `settingEl` is the row and `listEl` is the container holding the group's
+	 * items; both are handed over by the API, so unlike the first attempt there
+	 * is no walking up the DOM guessing which ancestor is which.
+	 *
+	 * The row's interior is built here rather than left to the framework. A
+	 * settings row is laid out by Obsidian — horizontally on desktop, as a
+	 * column on mobile, and only the framework knows which — and the two slots
+	 * it offers for content (`infoEl`, `controlEl`) are siblings, so whatever
+	 * the host does to lay the row out decides where the caret ends up. That is
+	 * how the caret came to sit under the title, flush left, and why restating
+	 * the row's `flex-direction` kept failing: it was a correction to a layout
+	 * owned by someone else, applied by guesswork.
+	 *
+	 * So the row is given one child of our own — title and description, then
+	 * the caret — and that child lays itself out. The host now has a single box
+	 * to place, and no direction it can stack in can separate the title from
+	 * the caret.
 	 */
 	private wireHeaderRow(setting: Setting, group: SettingGroup | undefined, id: GroupId): void {
 		const rowEl = setting.settingEl;
 		const listEl = group?.listEl;
 
 		rowEl.addClass("subtle-toc-settings-group-header");
+
+		// The framework may render the same row more than once; keep one
+		// interior rather than stacking title/description/caret per render.
+		rowEl.querySelector<HTMLElement>(".subtle-toc-settings-group-head")?.remove();
+
+		const headEl = rowEl.createDiv({ cls: "subtle-toc-settings-group-head" });
+		const textEl = headEl.createDiv({ cls: "subtle-toc-settings-group-text" });
+		textEl.createDiv({ cls: "subtle-toc-settings-group-title", text: GROUP_LABELS[id] });
+		textEl.createDiv({ cls: "subtle-toc-settings-group-desc", text: GROUP_DESCRIPTIONS[id] });
+		// The caret slot. Obsidian's own extra button is moved into it below;
+		// nothing is written into the framework's info/control boxes at all
+		// (styles.css takes them out of the layout), so all three of the row's
+		// visible parts live in the one child above.
+		const caretEl = headEl.createDiv({ cls: "subtle-toc-settings-group-caret" });
 
 		if (!listEl) {
 			// Nothing to scope the hide to. Leave the group open rather than
@@ -187,6 +232,11 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 		setting.addExtraButton((b) => {
 			chevron = b;
 			b.onClick(toggle);
+			// Obsidian's own button, moved into the slot this row owns. Its
+			// click handler, tooltip and teardown stay the framework's; only
+			// its position is ours. (addExtraButton appends it to the row's
+			// control box first, which styles.css hides.)
+			caretEl.appendChild(b.extraSettingsEl);
 		});
 
 		rowEl.addEventListener("click", (ev) => {

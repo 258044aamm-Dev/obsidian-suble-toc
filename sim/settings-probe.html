@@ -69,6 +69,53 @@
 			body.is-mobile .clickable-icon {
 				min-height: 44px;
 			}
+			/* ---------------------------------------------------------------
+			   Host fixtures: the layouts Obsidian can put a settings row
+			   inside. These are deliberately hostile -- the row in them is
+			   given no layout of its own (below), because after 0.7.0-0.7.3
+			   the plugin's row must not depend on one. A row that only works
+			   inside a flex row parent is the bug this suite exists to catch.
+			   --------------------------------------------------------------- */
+			.subtle-toc-settings-host {
+				width: 100%;
+			}
+			.subtle-toc-settings-host.is-block {
+				display: block;
+			}
+			.subtle-toc-settings-host.is-rowflex {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+				gap: 8px;
+			}
+			.subtle-toc-settings-host.is-columnflex {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 8px;
+			}
+			/* Core's own row LAYOUT is deliberately NOT modelled for a host
+			   row: no display, no direction, no alignment. Whatever the plugin
+			   row does inside this, it does on its own. Its spacing is kept,
+			   though -- in the app a `.setting-item` is always padded by core,
+			   and stripping that too would have the fixture measuring a row
+			   the plugin will never actually be handed. */
+			.setting-item.is-host,
+			body.is-mobile .setting-item.is-host {
+				display: block;
+				gap: 0;
+			}
+			/* A row the framework stacks: name on top, control beneath, flush
+			   left. Stands in for core's own stacked row so the control row
+			   stacks under either fixture, not only under is-mobile. */
+			.setting-item.is-stacked,
+			body.is-mobile .setting-item.is-stacked {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 8px;
+			}
+
 			.clickable-icon {
 				padding: 4px 8px;
 				color: var(--text-muted);

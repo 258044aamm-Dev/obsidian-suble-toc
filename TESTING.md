@@ -1,4 +1,4 @@
-# Device test checklist — 0.7.3-beta.1
+# Device test checklist — 0.7.4-beta.1
 
 What I verified in the simulation harness, and what only a real device can tell
 us. Everything in §1 is already automated (`node verify.mjs`, 48 assertions);
@@ -104,9 +104,12 @@ The harness mocks Obsidian, so these are the things it genuinely cannot prove.
 - [ ] The four groups read as **rows**, the same weight as the Advanced row —
       not as large bold section headings
 - [ ] Each group row spans the **full width** of the settings pane
-- [ ] The caret sits on the **right-hand side** of the group row, on the same
-      line as the title — not underneath it
-- [ ] Group rows are a single row tall, with no empty band below the title
+- [ ] Each group row shows a **one-line description** under its title, in
+      muted text (Content, Appearance, Minimap, Behavior)
+- [ ] The **caret is at the right-hand edge** of the group row, level with the
+      title and description — **on desktop and on the phone**. Two releases
+      claimed this and were only half true: check both.
+- [ ] Group rows are a single row tall, with no empty band below the text
 - [ ] The four group rows have a faint background tint distinguishing them
       from the settings inside them
 - [ ] All four groups on it start **collapsed**
@@ -121,6 +124,38 @@ The harness mocks Obsidian, so these are the things it genuinely cannot prove.
       **Default tab** should now be there. Set it back to Unified and it goes
 - [ ] Active tab colour still has its reset arrow, and the reset works
 - [ ] Every setting you had before still has the value you left it on
+
+### If the caret is still in the wrong place
+
+Check the build first — a stale `main.js`/`styles.css` in the vault looks exactly
+like a fix that did not work. *Settings → Community plugins* should say
+**0.7.4-beta.1**, and this should print the plugin's own selectors:
+
+```js
+[...document.styleSheets].flatMap(s => { try { return [...s.cssRules] } catch { return [] } })
+  .filter(r => r.selectorText?.includes("subtle-toc-settings-group-head"))
+  .map(r => r.selectorText)
+```
+
+Then paste this in the console with the Advanced page open, and send the JSON
+back — it is one object, and it turns "the caret is wrong" into a fixture worth
+testing against:
+
+```js
+const row = document.querySelector(".subtle-toc-settings-group-header");
+const box = (el) => { const c = getComputedStyle(el);
+  return { cls: el.className, display: c.display, dir: c.flexDirection,
+           w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height) }; };
+console.log(JSON.stringify({
+  row: box(row), parent: box(row.parentElement),
+  children: [...row.children].map(box),
+  caretParent: row.querySelector(".clickable-icon")?.parentElement?.className,
+  outerHTML: row.outerHTML,
+}, null, 2));
+```
+
+Console: `Ctrl/Cmd+Shift+I` on desktop, `chrome://inspect` on Android, and
+Safari's *Develop* menu on iOS.
 
 ### Known limitations (not fixed in this round — Phase 4/5 of `PLAN.md`)
 

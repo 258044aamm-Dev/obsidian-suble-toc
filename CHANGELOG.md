@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.7.4-beta.1
+
+Puts the caret on the right-hand side of the Advanced page's group rows, and
+gives each group the one-line description it was missing. Settings UI only — no
+outline, overlay, behaviour or default changed.
+
+### Fixed
+
+- **The caret sat under the group title**, flush left, with a tall band of dead
+  space beneath it — on desktop *and* on a phone. This is the fourth fix for
+  that symptom, and the first one that removes its cause instead of arguing with
+  it. A settings row is laid out by Obsidian, and the two slots it offers for
+  content (`infoEl`, `controlEl`) are siblings of each other: whatever the host
+  does to lay the row out decides where the caret lands. Restating the row's own
+  `flex-direction` could only ever out-argue one of those layouts, on one
+  platform, until the next stylesheet change — which is why 0.7.1, 0.7.2 and
+  0.7.3 each shipped a fix a device could still contradict.
+
+### Changed
+
+- **The row's interior is ours now.** The header row carries a single child —
+  title, description, then the caret — and lays that child out itself. The host
+  has one box to place, so no direction it stacks in can separate the title from
+  the caret. Core's own name/desc/control boxes stay in the DOM (the framework
+  pokes at them on re-render) but are taken out of the layout, scoped to this
+  row's class, so no other settings row — this plugin's, Obsidian's or another
+  plugin's — is touched.
+- **Each group describes itself in one line**, drawn under its title: Content,
+  Appearance, Minimap, Behavior. The same line is mirrored into the definition's
+  `desc` so the row and the definition cannot drift apart, which
+  `tests/settings.test.ts` asserts.
+
+### Unchanged
+
+Groups still start collapsed, still toggle independently, still reset when the
+settings window closes, still degrade to open when no list element is handed
+over, and still keep out of settings search. The caret is still Obsidian's own
+extra button — only its position is ours — so clicking it toggles once rather
+than twice, the row remains the click target, Enter and Space still work, and
+every setting keeps its key, type and default. No overlay rule changed.
+
+### Testing
+
+Three releases shipped a caret that was wrong on the user's screen while the
+suite stayed green, so the suite is the more important half of this change.
+
+- **The harness no longer models Obsidian's row.** `sim/settings-probe.html`
+  declared `.setting-item { display: flex }` itself and the probe put the
+  chevron into `controlEl` with its own hands, so the row layout the plugin
+  depends on was an assumption *encoded as a fixture* — and no assertion could
+  fail while that assumption held. Five shapes are now asserted against: the
+  header inside the group's list element, beside it, and inside a plain block, a
+  row-direction and a column-direction wrapper. In the last three the row is
+  given **no layout at all**, so the plugin's row has to stand on its own in
+  every direction.
+- **A negative control that has to fail.** The two-slot row — title in one box,
+  chevron in the next, stacked — is rendered with no plugin markup in play, and
+  the geometry check is asserted to *fail* against it. A fixture that cannot see
+  the defect is not a fixture.
+- **Geometry, not properties.** The caret must sit right of the title, at the
+  row's own right-hand edge (measured against the row's content box, not the
+  title's width), level with the text block, last in the row — and the row must
+  be one line tall rather than three stacked. Titles, descriptions and carets
+  are counted, and an ordinary settings row is checked to still show its own
+  name.
+- Taking the row's layout away reproduces the defect in the harness: 90 failing
+  assertions, on both fixtures. 479 browser assertions across fixture × shape,
+  71 unit tests.
+
 ## 0.7.3-beta.1
 
 Fixes the caret position on the Advanced page's group rows. CSS only — no

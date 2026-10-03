@@ -126,6 +126,53 @@ describe("definition tree", () => {
 		}
 	});
 
+	it("describes each group in one line, in the row and in the definition", () => {
+		// The row draws its own title and description from GROUP_DESCRIPTIONS
+		// (settings.ts) rather than from the framework's boxes, and mirrors the
+		// description into the definition's `desc`. Asserting on the definition
+		// is what keeps the two from drifting apart.
+		const { tab } = makeTab();
+		const headers = (tab.getSettingDefinitions() as AnyDef[])
+			.find((d) => d.type === "page")!
+			.items.map((g: AnyDef) => g.items[0]);
+
+		const descs = headers.map((h: AnyDef) => h.desc);
+		expect(descs.every((d: unknown) => typeof d === "string" && d.trim().length > 8)).toBe(true);
+		expect(new Set(descs).size).toBe(headers.length);
+		// Still an affordance, not a setting: the description is drawn, but the
+		// row stays out of settings search.
+		expect(headers.every((h: AnyDef) => h.searchable === false)).toBe(true);
+	});
+
+	it("has no stylesheet rule for a class the settings tab never emits", () => {
+		// Two renames have already left dead rules behind in this file: the
+		// overlay class the settings groups stole in 0.7.0, and the row-layout
+		// rules that restating `flex-direction` left in 0.7.3. Read the emitted
+		// classes out of the tab and the styled ones out of styles.css, and the
+		// check fails the moment the two disagree about a name -- from either
+		// side, since a class the tab renamed shows up here as its old rule
+		// staying behind.
+		const root = path.resolve(fileURLToPath(import.meta.url), "../..");
+		const withoutComments = (text: string) =>
+			text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+		const classesIn = (file: string, selector: boolean) =>
+			new Set(
+				(
+					withoutComments(readFileSync(path.join(root, file), "utf8")).match(
+						selector ? /\.subtle-toc-settings-[a-z-]+/g : /subtle-toc-settings-[a-z-]+/g,
+					) ?? []
+				).map((token) => token.replace(/^\./, "").replace(/-+$/, "")),
+			);
+
+		const emitted = classesIn("src/settings.ts", false);
+		const styled = classesIn("styles.css", true);
+
+		expect(emitted.size).toBeGreaterThan(4);
+		expect(styled.size).toBeGreaterThan(4);
+		expect([...styled].filter((cls) => !emitted.has(cls))).toEqual([]);
+	});
+
 	it("exposes every setting that the old UI exposed, and no key twice", () => {
 		const { tab } = makeTab();
 		const keys = controlKeysOf(tab.getSettingDefinitions() as AnyDef[]);

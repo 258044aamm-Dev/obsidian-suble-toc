@@ -411,21 +411,56 @@ console.log("\nHeader button: never");
 	const rows = (id) => page.evaluate((x) => window.probe.rowsOf(x), id);
 	const width = (id) => page.evaluate((x) => window.probe.widthOf(x), id);
 	const geom = (id) => page.evaluate((x) => window.probe.geometryOf(x), id);
+	const slots = (id) => page.evaluate((x) => window.probe.slotsOf(x), id);
+
+	// Click the row *body*, the way a pointer would: a point inside the row and
+	// clear of the caret. The old suite clicked `.setting-item-info`, a box the
+	// plugin no longer draws into -- and clicking a child by name would pass
+	// even if the row had no hit area of its own. Clicking the locator (rather
+	// than the mouse at a measured point) is also what scrolls the row into
+	// view: every group below the first is off-screen once the ones above it
+	// are open, and a mouse click at those coordinates lands on nothing.
+	const clickRowBody = async (id) => {
+		const row = page.locator(`${g(id)} ${HEADER}`);
+		const box = await row.boundingBox();
+		await row.click({ position: { x: 24, y: box.height / 2 } });
+	};
+
+	// ---------------------------------------------------------- the control
+	//
+	// First, the shape the bug came out of: title in the framework's info box,
+	// chevron in its control box, two siblings inside a column-direction host,
+	// and no plugin markup anywhere. The assertion below has to *fail* here, or
+	// this suite cannot see the defect it exists for -- which is exactly how
+	// three releases shipped a caret under the title with 160 green checks.
+	await page.evaluate(() => window.probe.renderTwoSlotRow());
+	{
+		const c = await page.evaluate(() => window.probe.twoSlotGeometry());
+		check(
+			"[control] a two-slot row in a column host puts the caret under the title",
+			c.caretLeft < c.titleRight && Math.abs(c.caretMidY - c.titleMidY) >= 2,
+			`caretLeft=${c.caretLeft} titleRight=${c.titleRight} caretMidY=${c.caretMidY} titleMidY=${c.titleMidY}`,
+		);
+	}
 
 	// Two axes, because each one hid a bug that reached the user.
 	//
 	//   fixture  desktop vs mobile. Obsidian stacks a settings row on mobile
-	//            unless it carries a control modifier class, which is what put
-	//            the caret under the title.
-	//   shape    where the header sits relative to the group's list element.
-	//            Obsidian owns that markup and the harness cannot see it.
+	//            unless it carries a control modifier class.
+	//   shape    what the framework puts the row in. A and B: inside the
+	//            group's list element, or beside it. C, H, I: inside a plain
+	//            block wrapper, a row-direction flex one, and a column one --
+	//            and in those the row is given no layout of its own, so the
+	//            plugin's row has to stand on its own in each direction.
+	//            Obsidian owns all of this markup and the harness cannot see
+	//            it, so every plausible shape is asserted against, not bet on.
 	for (const fixture of ["desktop", "mobile"]) {
 		await page.setViewportSize(
 			fixture === "mobile" ? { width: 390, height: 844 } : { width: 900, height: 900 },
 		);
 		await page.evaluate((f) => window.probe.setFixture(f), fixture);
 
-		for (const shape of ["A", "B"]) {
+		for (const shape of ["A", "B", "C", "H", "I"]) {
 			const tag = `${fixture}/${shape}`;
 			console.log(`  -- ${tag}`);
 			await page.evaluate((sh) => window.probe.renderPage({ shape: sh }), shape);
@@ -445,7 +480,34 @@ console.log("\nHeader button: never");
 				);
 			}
 
-			// Geometry. The caret must be beside the title, not beneath it.
+			// The row's interior. One title, one description, one caret, all
+			// drawn by the plugin -- and the framework's own boxes taken out of
+			// the layout without touching any other row's.
+			for (const id of ["content", "behavior"]) {
+				const s = await slots(id);
+				check(
+					`[${tag}] ${id} the framework's name and control boxes are not drawn`,
+					s.frameworkInfoHidden && s.frameworkControlHidden,
+					JSON.stringify(s),
+				);
+				check(
+					`[${tag}] ${id} exactly one title, description and caret are visible`,
+					s.visibleTitles === 1 && s.visibleDescs === 1 && s.visibleCarets === 1,
+					JSON.stringify(s),
+				);
+				check(
+					`[${tag}] ${id} the caret lives in the row's own child`,
+					s.caretWithinHead,
+				);
+				check(
+					`[${tag}] ${id} hiding the framework's boxes leaves other rows alone`,
+					s.ordinaryNameVisible,
+				);
+			}
+
+			// Geometry. The caret must sit out at the right-hand edge of the
+			// row, level with the title and description it belongs to -- not
+			// under the title, and not merely right of a short one.
 			for (const id of ["content", "behavior"]) {
 				const geo = await geom(id);
 				check(
@@ -453,18 +515,36 @@ console.log("\nHeader button: never");
 					geo.caretLeft >= geo.titleRight,
 					`caretLeft=${geo.caretLeft} titleRight=${geo.titleRight}`,
 				);
+				// The row's text is two lines now, so the caret is centred on
+				// the block rather than on the title alone -- what Obsidian does
+				// with a control beside a name and description.
 				check(
-					`[${tag}] ${id} caret shares the title's line`,
-					Math.abs(geo.caretMidY - geo.titleMidY) < 2,
-					`caretMidY=${geo.caretMidY} titleMidY=${geo.titleMidY}`,
+					`[${tag}] ${id} caret is level with the row's text`,
+					Math.abs(geo.caretMidY - (geo.titleTop + geo.descBottom) / 2) < 3,
+					`caretMidY=${geo.caretMidY} text=${Math.round((geo.titleTop + geo.descBottom) / 2)}`,
 				);
-				// Laid out as a row the content is about the taller of the two;
-				// stacked it is their sum. No magic threshold, so this holds on
-				// desktop and mobile alike.
 				check(
-					`[${tag}] ${id} header is one row, not two stacked`,
+					`[${tag}] ${id} caret sits at the right-hand edge of the row`,
+					geo.caretRight >= geo.rowRight - 3,
+					`caretRight=${geo.caretRight} rowRight=${geo.rowRight}`,
+				);
+				// Laid out as a row the content is about the tallest of the
+				// three; stacked it is their sum. No magic threshold.
+				check(
+					`[${tag}] ${id} header is one row, not three stacked`,
 					geo.contentHeight < geo.stackedHeight,
 					`content=${geo.contentHeight} stacked=${geo.stackedHeight} rowHeight=${geo.rowHeight}`,
+				);
+				check(
+					`[${tag}] ${id} group carries a description under its title`,
+					geo.descText.length > 0 &&
+						geo.descTop >= geo.titleBottom - 2 &&
+						geo.descTop <= geo.titleBottom + 8,
+					`desc="${geo.descText}" descTop=${geo.descTop} titleBottom=${geo.titleBottom}`,
+				);
+				check(
+					`[${tag}] ${id} the caret is the row's last element`,
+					geo.caretIsLast === true,
 				);
 			}
 
@@ -503,7 +583,7 @@ console.log("\nHeader button: never");
 			);
 
 			// Clicking the row body expands.
-			await page.click(`${g("content")} ${HEADER} .setting-item-info`);
+			await clickRowBody("content");
 			const opened = await rows("content");
 			check(
 				`[${tag}] clicking the header expands the group`,
@@ -517,6 +597,11 @@ console.log("\nHeader button: never");
 				`[${tag}] aria-expanded tracks the state`,
 				(await page.getAttribute(`${g("content")} ${HEADER}`, "aria-expanded")) === "true",
 			);
+			check(
+				`[${tag}] the caret flips to open when expanded`,
+				(await page.getAttribute(`${g("content")} ${HEADER} .clickable-icon`, "data-icon")) ===
+					"chevron-down",
+			);
 			const openW = await width("content");
 			check(
 				`[${tag}] every row fills the pane when expanded`,
@@ -528,8 +613,9 @@ console.log("\nHeader button: never");
 			check(
 				`[${tag}] caret stays beside the title when expanded`,
 				openGeo.caretLeft >= openGeo.titleRight &&
-					Math.abs(openGeo.caretMidY - openGeo.titleMidY) < 2,
-				`caretLeft=${openGeo.caretLeft} titleRight=${openGeo.titleRight}`,
+					Math.abs(openGeo.caretMidY - (openGeo.titleTop + openGeo.descBottom) / 2) < 3 &&
+					openGeo.caretRight >= openGeo.rowRight - 3,
+				`caretLeft=${openGeo.caretLeft} titleRight=${openGeo.titleRight} caretRight=${openGeo.caretRight} rowRight=${openGeo.rowRight}`,
 			);
 
 			// Clicking the chevron must toggle once, not twice.
@@ -551,7 +637,7 @@ console.log("\nHeader button: never");
 			);
 
 			for (const id of ["appearance", "minimap", "behavior"]) {
-				await page.click(`${g(id)} ${HEADER}`);
+				await clickRowBody(id);
 			}
 			let allVisible = true;
 			for (const id of ["content", "appearance", "minimap", "behavior"]) {
@@ -594,7 +680,7 @@ console.log("\nHeader button: never");
 		}
 
 		if (SHOTS) {
-			await page.evaluate(() => window.probe.renderPage({ shape: "A" }));
+			await page.evaluate(() => window.probe.renderPage({ shape: "I" }));
 			await page.screenshot({
 				path: `${SHOT_DIR}/07-settings-groups-${fixture}.png`,
 				fullPage: true,
