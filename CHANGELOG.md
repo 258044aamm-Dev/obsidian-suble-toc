@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.7.0-beta.1
+
+Settings UI only. No change to the outline, the overlay, the minimap or any
+default — `src/overlay.ts`, `src/outline.ts`, `src/markdown.ts`, `src/dom.ts`
+and `src/types.ts` are byte-identical to 0.6.0-beta.1.
+
+### Changed
+
+- **Settings are split into basic and advanced.** Seven settings now sit on the
+  root page: Show, Outline mode, Side, Open the popover on, Show minimap, Note
+  header button, and Hide minimap on phones. Everything else moved behind a
+  single **Advanced** entry that opens a sub-page.
+- **The advanced page is grouped and collapsible.** Content, Appearance,
+  Minimap and Behavior each collapse from their header. Every group starts
+  collapsed and reopens collapsed: the state is deliberately not written to
+  `data.json`, so closing settings or the app resets it.
+- **Rebuilt on Obsidian's declarative settings API** (`getSettingDefinitions()`).
+  Settings now appear in Obsidian's global settings search — typing "minimap"
+  in the settings search finds them. This is why `minAppVersion` moves to
+  **1.13.1**: the API does not exist before 1.13, and on 1.13+ the framework
+  bypasses `display()` entirely, so there is no partial migration.
+- The Mobile group is gone: both of its settings were promoted to the root page.
+
+### Fixed
+
+- Dragging the close-delay slider previously wrote to disk once per step; it is
+  now debounced like every other slider.
+
+### Unchanged on purpose
+
+- All 27 setting keys keep their names, types and defaults. An existing
+  `data.json` loads with no migration.
+- The three settings the overlay reads live — close delay, smooth scroll and
+  scroll-to-heading-on-hover — still persist without rebuilding the overlay.
+- The heading-level sliders still push each other apart instead of inverting.
+- Default tab still appears only in tabs mode.
+- The active tab colour keeps its inline reset-to-theme button.
+
 ## 0.6.0-beta.1
 
 ### Added

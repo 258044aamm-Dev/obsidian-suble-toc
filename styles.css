@@ -708,3 +708,42 @@
 		color: var(--text-normal);
 	}
 }
+
+/* ==========================================================================
+   Settings tab — collapsible groups on the Advanced page
+   ==========================================================================
+
+   Obsidian's declarative settings API has no collapse support, so the group
+   header gets a chevron (wired in settings.ts) that toggles .is-collapsed on
+   the group root. Hiding is done here rather than with a `visible` predicate
+   on each row, because a row hidden by `visible` is also dropped from
+   Obsidian's settings search -- collapsed-by-default would make every
+   advanced setting unfindable.
+
+   The header is tagged by script as the one child to keep, so this rule does
+   not depend on knowing Obsidian's internal group markup. If that tagging
+   ever fails, settings.ts leaves the group permanently expanded and
+   .is-collapsed is never applied, so content cannot become unreachable. */
+
+.subtle-toc-group-header {
+	cursor: pointer;
+	border-radius: var(--radius-s);
+}
+
+.subtle-toc-group-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.subtle-toc-group-header:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.subtle-toc-group.is-collapsed > *:not(.subtle-toc-group-header) {
+	display: none;
+}
+
+/* The chevron should not swallow the header's own click target. */
+.subtle-toc-group-header .clickable-icon {
+	flex: 0 0 auto;
+}

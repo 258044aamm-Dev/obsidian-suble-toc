@@ -1,4 +1,4 @@
-# Device test checklist — 0.6.0-beta.1
+# Device test checklist — 0.7.0-beta.1
 
 What I verified in the simulation harness, and what only a real device can tell
 us. Everything in §1 is already automated (`node verify.mjs`, 48 assertions);
@@ -19,6 +19,10 @@ Copy `main.js`, `manifest.json` and `styles.css` into:
 
 Then reload Obsidian and enable **Subtle TOC**. For the phone, sync that folder
 the way you normally sync your vault.
+
+> **Requires Obsidian 1.13.1 or newer.** The settings tab is built on the
+> declarative API added in 1.13, and Obsidian will refuse to load the plugin
+> below that version. `0.6.0-beta.1` remains installable if you need to go back.
 
 > **Your existing settings are preserved.** New options are added with defaults
 > and nothing you had configured is reset. The one deliberate change is
@@ -92,6 +96,23 @@ The harness mocks Obsidian, so these are the things it genuinely cannot prove.
 
 - [ ] Both the edge markers **and** the header button are available
 - [ ] The sheet (not the desktop popover) is what opens
+
+### Settings tab (new in 0.7.0-beta.1)
+
+- [ ] Settings open on a short page of seven rows plus an **Advanced** entry
+- [ ] Tapping **Advanced** opens a sub-page, and there is a way back
+- [ ] All four groups on it start **collapsed**
+- [ ] Tapping a group header — not just the chevron — expands it, and the
+      chevron flips
+- [ ] Close settings and reopen: the groups are collapsed again
+- [ ] Search Obsidian's settings for "minimap" and confirm Subtle TOC's rows
+      are found, including ones inside collapsed groups
+- [ ] Drag the popover width slider: the overlay updates once you stop, not on
+      every step
+- [ ] Set Outline mode to **Separate tabs**, then look in Advanced → Appearance:
+      **Default tab** should now be there. Set it back to Unified and it goes
+- [ ] Active tab colour still has its reset arrow, and the reset works
+- [ ] Every setting you had before still has the value you left it on
 
 ### Known limitations (not fixed in this round — Phase 4/5 of `PLAN.md`)
 

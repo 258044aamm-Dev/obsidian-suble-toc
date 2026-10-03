@@ -52,43 +52,71 @@ list items and callout headers, each sitting under the heading it belongs to.
 
 ## Settings
 
-Settings are grouped into **Content**, **Appearance**, **Minimap**, **Behavior**
-and **Mobile**.
+Settings open on a short page of the seven you are most likely to want. The
+rest live behind a single **Advanced** entry, on a sub-page of collapsible
+groups that start closed.
+
+### Basic
 
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Show | Both | Surface headings, tasks, or both. |
 | Outline mode | Unified tree | One nested tree, or the original separate Headings / Tasks tabs. |
+| Side | Right | Which edge of the note to dock on. |
+| Open the popover on | Hover | Hover the minimap, or require a click. |
+| Show minimap | On | The dashed markers along the edge. |
+| Note header button | On mobile only | Adds a button to the note header that opens the outline. |
+| Hide minimap on phones | On | Hide the edge markers on phone-sized screens, where they are too narrow to tap. |
+
+### Advanced
+
+Reached from the **Advanced** entry at the bottom of the settings page, grouped
+into four collapsible sections.
+
+**Content**
+
+| Setting | Default | What it does |
+| --- | --- | --- |
 | List items | None | Include plain bullets and numbered items: none, top level only, or all. |
 | Callouts | Off | Include callout headers as outline rows. |
 | Task statuses | To do | Which checkbox statuses appear. Only an unchecked task can be completed from the popover. |
+| Minimum / maximum heading level | 1 / 6 | Heading levels to include (tasks are unaffected). |
+
+**Appearance**
+
+| Setting | Default | What it does |
+| --- | --- | --- |
 | Clean up Markdown | On | Resolve links and strip formatting marks in row text. |
 | Hide tags | Off | Also remove tags from the displayed text. |
-| Collapsible rows | On | Allow folding a row to hide the rows nested under it. |
-| Note header button | On mobile only | Add a button to the note header that opens the outline. |
-| Hide minimap on phones | On | Hide the edge markers on phone-sized screens, where they are too narrow to tap. |
-| Default tab | Headings | *(Separate tabs mode only.)* Tab that leads the tab bar and opens first. |
-| Show task checkboxes | Off | Add a checkbox to each task row to complete it from the popover. |
 | Show multiple lines | On | Wrap long rows; when off, rows are single-line and hovering shows the full text. |
+| Show task checkboxes | Off | Add a checkbox to each task row to complete it from the popover. |
+| Collapsible rows | On | Allow folding a row to hide the rows nested under it. |
+| Popover width | 264 px | Set the TOC popover width from 160 to 480 pixels. |
 | Active tab color | *theme* | Background of the selected tab. Reset it to follow the theme. |
-| Show minimap | On | The dashed markers on the edge of the note. |
+| Default tab | Headings | *(Separate tabs mode only.)* Tab that leads the tab bar and opens first. |
+
+**Minimap**
+
+| Setting | Default | What it does |
+| --- | --- | --- |
 | Minimap marker width | 100% | Scale marker length from 50% to 200%; above 100%, higher-level headings grow progressively more. |
 | Minimap vertical scale | 100% | Scale marker thickness and spacing from 50% to 200%. |
 | Show tasks in minimap | On | The open-task badge on the edge. Notes with tasks but no headings always show it. |
-| Side | Right | Which edge the TOC docks on. |
-| Open the popover on | Hover | Hover the minimap, or require a click. |
+
+**Behavior**
+
+| Setting | Default | What it does |
+| --- | --- | --- |
 | Close delay | 160 ms | Grace period before the popover closes once the mouse leaves it. |
-| Popover width | 264 px | Set the TOC popover width from 160 to 480 pixels. |
 | Smooth scroll | On | Animate the scroll when navigating. |
 | Scroll to heading on hover | Off | Temporarily scroll to a hovered heading and return on leave; click to navigate normally and stay there. |
-| Minimum / maximum heading level | 1 / 6 | Heading levels to include (tasks are unaffected). |
 
 ## Develop and verify
 
 ```bash
 npm install
 npm run dev     # esbuild watch -> rebuilds main.js on change
-npm test        # unit tests for the outline tree and Markdown stripping
+npm test        # unit tests: outline tree, Markdown stripping, settings
 npm run sim     # build the browser simulation harness
 ```
 

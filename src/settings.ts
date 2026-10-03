@@ -1,37 +1,29 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
 import {
-	TocDefaultTab,
-	TocHeaderButton,
-	TocListItems,
-	TocOutlineMode,
-	TocShow,
-	TaskStatusKey,
-} from "./types";
+	App,
+	ExtraButtonComponent,
+	PluginSettingTab,
+	SettingDefinitionGroup,
+	SettingDefinitionItem,
+	SettingGroupItem,
+} from "obsidian";
 import { STATUS_LABELS } from "./outline";
+import {
+	FALLBACK_ACTIVE_TAB_BG,
+	SaveMode,
+	SettingsControlKey,
+	SLIDER_KEYS,
+	STATUS_ORDER,
+	readControl,
+	writeControl,
+} from "./settings-model";
 import type SubtleTocPlugin from "./main";
-
-/** Only where the picker starts while the color is unset — a neutral gray, since
- *  the theme's own value can be a translucent rgba() the picker can't show. */
-const FALLBACK_ACTIVE_TAB_BG = "#7a7a7a";
-
-/** Statuses offered as toggles, in the order they appear. */
-const STATUS_ORDER: TaskStatusKey[] = [
-	"todo",
-	"inProgress",
-	"done",
-	"forwarded",
-	"important",
-	"question",
-	"cancelled",
-	"other",
-];
 
 /**
  * Debounce writes that a slider fires continuously.
  *
- * Dragging a slider emits an event per step, and each one previously wrote
- * settings to disk and rebuilt the entire overlay — roughly sixteen of each
- * for one sweep of the minimap width slider.
+ * Dragging a slider emits an event per step, and each one would otherwise
+ * write settings to disk and rebuild the entire overlay — roughly sixteen of
+ * each for one sweep of the minimap width slider.
  */
 function debounce<T extends unknown[]>(fn: (...args: T) => void, ms: number) {
 	let timer: number | null = null;
@@ -44,428 +36,434 @@ function debounce<T extends unknown[]>(fn: (...args: T) => void, ms: number) {
 	};
 }
 
+/** Groups on the advanced page, in render order. Ids are used for collapse state. */
+const GROUPS = ["content", "appearance", "minimap", "behavior"] as const;
+type GroupId = (typeof GROUPS)[number];
+
+/**
+ * The settings tab.
+ *
+ * Built on the declarative API Obsidian 1.13 introduced: `getSettingDefinitions()`
+ * returns the whole tab as data and the framework renders it, which is why there
+ * is no `display()` here. Returning a non-empty array makes the framework bypass
+ * `display()` entirely, so this is all-or-nothing — there is no half-migrated
+ * state in which some rows render imperatively.
+ *
+ * Shape: the handful of settings most people actually touch sit on the root
+ * page, and everything else lives behind a single "Advanced" entry that opens a
+ * sub-page of collapsible groups.
+ */
 export class SubtleTocSettingTab extends PluginSettingTab {
 	plugin: SubtleTocPlugin;
+
+	/**
+	 * Groups the user has opened, by id.
+	 *
+	 * Deliberately not persisted: every group starts collapsed, and the set is
+	 * cleared in hide(), so closing the settings window — or the app — returns
+	 * the page to its collapsed state. Keeping it out of data.json also means
+	 * no new setting key and no migration.
+	 */
+	private readonly expanded = new Set<GroupId>();
+
+	/** Coalesced across a debounce window; "refresh" wins over "save". */
+	private pendingMode: SaveMode | null = null;
 
 	constructor(app: App, plugin: SubtleTocPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
-	/** Persist and rebuild, coalescing the burst a slider drag produces. */
+	hide(): void {
+		this.expanded.clear();
+		super.hide();
+	}
+
+	// ---- value plumbing ----------------------------------------------------
+
+	getControlValue(key: string): unknown {
+		return readControl(this.plugin.settings, key as SettingsControlKey);
+	}
+
+	setControlValue(key: string, value: unknown): void {
+		const controlKey = key as SettingsControlKey;
+		const mode = writeControl(this.plugin.settings, controlKey, value);
+		// null means the value failed validation and nothing was written.
+		if (mode === null) return;
+		this.queue(mode, SLIDER_KEYS.has(controlKey));
+	}
+
+	private queue(mode: SaveMode, debounced: boolean): void {
+		this.pendingMode = this.pendingMode === "refresh" ? "refresh" : mode;
+		if (debounced) this.commitDebounced();
+		else void this.flush();
+	}
+
+	private async flush(): Promise<void> {
+		const mode = this.pendingMode;
+		this.pendingMode = null;
+		if (mode === "refresh") await this.plugin.saveAndRefresh();
+		else if (mode === "save") await this.plugin.saveSettings();
+	}
+
 	private readonly commitDebounced = debounce(() => {
-		void this.plugin.saveAndRefresh();
+		void this.flush();
 	}, 250);
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	// ---- collapsing --------------------------------------------------------
 
-		this.addContentSection(containerEl);
-		this.addAppearanceSection(containerEl);
-		this.addMinimapSection(containerEl);
-		this.addBehaviourSection(containerEl);
-		this.addMobileSection(containerEl);
-	}
+	/**
+	 * Wire the chevron in a group header to collapse that group.
+	 *
+	 * Obsidian's settings API has no collapse support, so this is the one place
+	 * reaching into DOM the framework owns. It is deliberately contained: if the
+	 * structure is ever not what we expect, the group is left permanently
+	 * expanded rather than throwing or rendering a header with no way to open it.
+	 *
+	 * Collapsing is CSS-only rather than a `visible` predicate on each row,
+	 * because a row hidden by `visible` is also dropped from Obsidian's settings
+	 * search for that render — collapsed-by-default would make every advanced
+	 * setting unfindable.
+	 */
+	private wireCollapse(button: ExtraButtonComponent, id: GroupId): void {
+		const groupEl = button.extraSettingsEl.closest<HTMLElement>(`.subtle-toc-group--${id}`);
 
-	// ---- content -----------------------------------------------------------
-
-	private addContentSection(containerEl: HTMLElement): void {
-		new Setting(containerEl).setName("Content").setHeading();
-
-		new Setting(containerEl)
-			.setName("Show")
-			.setDesc("Which content to surface: headings, open tasks, or both.")
-			.addDropdown((d) =>
-				d
-					.addOption("both", "Both")
-					.addOption("headings", "Headings")
-					.addOption("tasks", "Tasks")
-					.setValue(this.plugin.settings.show)
-					.onChange(async (v) => {
-						this.plugin.settings.show = v as TocShow;
-						await this.plugin.saveAndRefresh();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Outline mode")
-			.setDesc(
-				"Unified shows one nested tree with tasks and lists under their heading. Separate tabs keeps the original Headings and Tasks split.",
-			)
-			.addDropdown((d) =>
-				d
-					.addOption("unified", "Unified tree")
-					.addOption("tabs", "Separate tabs")
-					.setValue(this.plugin.settings.outlineMode)
-					.onChange(async (v) => {
-						this.plugin.settings.outlineMode = v as TocOutlineMode;
-						await this.plugin.saveAndRefresh();
-						this.display();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("List items")
-			.setDesc(
-				"Include plain bullets and numbered items, not just checkboxes. Long notes can produce a lot of rows, so this starts off.",
-			)
-			.addDropdown((d) =>
-				d
-					.addOption("none", "None")
-					.addOption("top", "Top level only")
-					.addOption("all", "All")
-					.setValue(this.plugin.settings.listItems)
-					.onChange(async (v) => {
-						this.plugin.settings.listItems = v as TocListItems;
-						await this.plugin.saveAndRefresh();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Callouts")
-			.setDesc("Include callout headers, such as a note or warning title, as outline rows.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.showCallouts).onChange(async (v) => {
-					this.plugin.settings.showCallouts = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Task statuses")
-			.setDesc(
-				"Which checkbox statuses appear in the outline. Only an unchecked task can be completed from the popover.",
-			);
-
-		for (const key of STATUS_ORDER) {
-			new Setting(containerEl)
-				.setName(STATUS_LABELS[key])
-				.setClass("subtle-toc-sub-setting")
-				.addToggle((t) =>
-					t.setValue(this.plugin.settings.taskStatuses.includes(key)).onChange(async (v) => {
-						const set = new Set(this.plugin.settings.taskStatuses);
-						if (v) set.add(key);
-						else set.delete(key);
-						this.plugin.settings.taskStatuses = STATUS_ORDER.filter((k) => set.has(k));
-						await this.plugin.saveAndRefresh();
-					}),
-				);
+		// The header is whichever direct child of the group contains the chevron.
+		let headerEl: HTMLElement | null = null;
+		if (groupEl) {
+			let node: HTMLElement = button.extraSettingsEl;
+			while (node.parentElement && node.parentElement !== groupEl) {
+				node = node.parentElement;
+			}
+			if (node.parentElement === groupEl) headerEl = node;
 		}
 
-		new Setting(containerEl)
-			.setName("Minimum heading level")
-			.setDesc("Lowest heading level to show (1 = H1).")
-			.addSlider((s) =>
-				s
-					.setLimits(1, 6, 1)
-					.setValue(this.plugin.settings.minLevel)
-					.setDynamicTooltip()
-					.onChange((v) => {
-						this.plugin.settings.minLevel = v;
-						if (v > this.plugin.settings.maxLevel) {
-							this.plugin.settings.maxLevel = v;
-						}
-						this.commitDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Maximum heading level")
-			.setDesc("Highest heading level to show (6 = H6).")
-			.addSlider((s) =>
-				s
-					.setLimits(1, 6, 1)
-					.setValue(this.plugin.settings.maxLevel)
-					.setDynamicTooltip()
-					.onChange((v) => {
-						this.plugin.settings.maxLevel = v;
-						if (v < this.plugin.settings.minLevel) {
-							this.plugin.settings.minLevel = v;
-						}
-						this.commitDebounced();
-					}),
-			);
-	}
-
-	// ---- appearance --------------------------------------------------------
-
-	private addAppearanceSection(containerEl: HTMLElement): void {
-		new Setting(containerEl).setName("Appearance").setHeading();
-
-		new Setting(containerEl)
-			.setName("Clean up Markdown")
-			.setDesc(
-				"Show heading and task text as a reader would see it, resolving links and removing formatting marks.",
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.stripMarkdown).onChange(async (v) => {
-					this.plugin.settings.stripMarkdown = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Hide tags")
-			.setDesc("Also remove tags from the text shown in the outline.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.stripTags).onChange(async (v) => {
-					this.plugin.settings.stripTags = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Show multiple lines")
-			.setDesc(
-				"Wrap long headings and tasks over as many lines as they need. When off, each row is cut to a single line and hovering it shows the full text.",
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.multiLine).onChange(async (v) => {
-					this.plugin.settings.multiLine = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Show task checkboxes")
-			.setDesc(
-				"Add a checkbox to each task in the popover; clicking it completes the task in the note.",
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.showTaskCheckboxes).onChange(async (v) => {
-					this.plugin.settings.showTaskCheckboxes = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Collapsible rows")
-			.setDesc("Allow folding a heading or task to hide the rows nested under it.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.collapsible).onChange(async (v) => {
-					this.plugin.settings.collapsible = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Popover width")
-			.setDesc("Set the width of the TOC popover in pixels (264 is the default).")
-			.addSlider((s) =>
-				s
-					.setLimits(160, 480, 8)
-					.setValue(this.plugin.settings.popoverWidth)
-					.setDynamicTooltip()
-					.onChange((v) => {
-						this.plugin.settings.popoverWidth = v;
-						this.commitDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Active tab color")
-			.setDesc("Background of the selected tab in the popover. Reset to follow the theme.")
-			.addColorPicker((c) =>
-				c
-					.setValue(this.plugin.settings.activeTabBgColor || FALLBACK_ACTIVE_TAB_BG)
-					.onChange(async (v) => {
-						this.plugin.settings.activeTabBgColor = v;
-						await this.plugin.saveAndRefresh();
-					}),
-			)
-			.addExtraButton((b) =>
-				b
-					.setIcon("rotate-ccw")
-					.setTooltip("Use the theme's color")
-					.onClick(async () => {
-						this.plugin.settings.activeTabBgColor = "";
-						await this.plugin.saveAndRefresh();
-						this.display();
-					}),
-			);
-
-		if (this.plugin.settings.outlineMode === "tabs") {
-			new Setting(containerEl)
-				.setName("Default tab")
-				.setDesc(
-					"Tab shown first in the popover. After that the last-used tab is kept; it always falls back to the tab that has content.",
-				)
-				.addDropdown((d) =>
-					d
-						.addOption("headings", "Headings")
-						.addOption("tasks", "Tasks")
-						.setValue(this.plugin.settings.defaultTab)
-						.onChange(async (v) => {
-							this.plugin.settings.defaultTab = v as TocDefaultTab;
-							await this.plugin.saveAndRefresh();
-						}),
-				);
+		if (!groupEl || !headerEl) {
+			// Degrade to always-expanded; never leave content unreachable.
+			this.expanded.add(id);
+			button.setIcon("chevron-down").setTooltip("Collapse");
+			return;
 		}
+
+		headerEl.addClass("subtle-toc-group-header");
+
+		const apply = () => {
+			const open = this.expanded.has(id);
+			button.setIcon(open ? "chevron-down" : "chevron-right");
+			button.setTooltip(open ? "Collapse" : "Expand");
+			groupEl.toggleClass("is-collapsed", !open);
+			headerEl.setAttribute("aria-expanded", open ? "true" : "false");
+		};
+
+		const toggle = () => {
+			if (this.expanded.has(id)) this.expanded.delete(id);
+			else this.expanded.add(id);
+			apply();
+		};
+
+		button.onClick(toggle);
+
+		// Make the whole header a target, not just the 18px chevron — this is
+		// the difference between usable and not on a phone.
+		if (headerEl.dataset.subtleTocCollapse !== "1") {
+			headerEl.dataset.subtleTocCollapse = "1";
+			headerEl.setAttribute("role", "button");
+			headerEl.tabIndex = 0;
+			headerEl.addEventListener("click", (ev) => {
+				// Let the chevron's own handler run; don't double-toggle.
+				if ((ev.target as HTMLElement).closest(".clickable-icon")) return;
+				toggle();
+			});
+			headerEl.addEventListener("keydown", (ev) => {
+				if (ev.key !== "Enter" && ev.key !== " ") return;
+				ev.preventDefault();
+				toggle();
+			});
+		}
+
+		apply();
 	}
 
-	// ---- minimap -----------------------------------------------------------
-
-	private addMinimapSection(containerEl: HTMLElement): void {
-		new Setting(containerEl).setName("Minimap").setHeading();
-
-		new Setting(containerEl)
-			.setName("Show minimap")
-			.setDesc("Show the dashed markers along the edge of the note.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.showMinimap).onChange(async (v) => {
-					this.plugin.settings.showMinimap = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Minimap marker width")
-			.setDesc("Scale the dashed markers (100% is the default).")
-			.addSlider((s) =>
-				s
-					.setLimits(50, 200, 10)
-					.setValue(this.plugin.settings.minimapWidthScale)
-					.setDynamicTooltip()
-					.onChange((v) => {
-						this.plugin.settings.minimapWidthScale = v;
-						this.commitDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Minimap vertical scale")
-			.setDesc(
-				"Scale marker thickness and spacing to make the minimap shorter or taller (100% is the default size).",
-			)
-			.addSlider((s) =>
-				s
-					.setLimits(50, 200, 10)
-					.setValue(this.plugin.settings.minimapVerticalScale)
-					.setDynamicTooltip()
-					.onChange((v) => {
-						this.plugin.settings.minimapVerticalScale = v;
-						this.commitDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Show tasks in minimap")
-			.setDesc(
-				"Show the open-task count on the edge of the note, next to the dashed markers. Notes with tasks but no headings always show it, so the TOC stays reachable.",
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.showTasksInMinimap).onChange(async (v) => {
-					this.plugin.settings.showTasksInMinimap = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
+	private group(id: GroupId, heading: string, items: SettingGroupItem[]): SettingDefinitionGroup {
+		return {
+			type: "group",
+			heading,
+			cls: `subtle-toc-group subtle-toc-group--${id}`,
+			extraButtons: [(b: ExtraButtonComponent) => this.wireCollapse(b, id)],
+			items,
+		};
 	}
 
-	// ---- behaviour ---------------------------------------------------------
+	// ---- definitions -------------------------------------------------------
 
-	private addBehaviourSection(containerEl: HTMLElement): void {
-		new Setting(containerEl).setName("Behavior").setHeading();
-
-		new Setting(containerEl)
-			.setName("Side")
-			.setDesc("Which edge of the note to dock the TOC on.")
-			.addDropdown((d) =>
-				d
-					.addOption("right", "Right")
-					.addOption("left", "Left")
-					.setValue(this.plugin.settings.side)
-					.onChange(async (v) => {
-						this.plugin.settings.side = v as "right" | "left";
-						await this.plugin.saveAndRefresh();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Open the popover on")
-			.setDesc("Hover over the minimap, or require a click to open. Touch always taps.")
-			.addDropdown((d) =>
-				d
-					.addOption("hover", "Hover")
-					.addOption("click", "Click")
-					.setValue(this.plugin.settings.openTrigger)
-					.onChange(async (v) => {
-						this.plugin.settings.openTrigger = v as "hover" | "click";
-						await this.plugin.saveAndRefresh();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Close delay")
-			.setDesc(
-				"How long the popover waits before closing after the mouse leaves it, in milliseconds. Raise it if it closes on you while switching tabs.",
-			)
-			.addSlider((s) =>
-				s
-					.setLimits(0, 1000, 20)
-					.setValue(this.plugin.settings.closeDelay)
-					.setDynamicTooltip()
-					.onChange(async (v) => {
-						this.plugin.settings.closeDelay = v;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Smooth scroll")
-			.setDesc("Animate the scroll when navigating to a heading.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.smoothScroll).onChange(async (v) => {
-					this.plugin.settings.smoothScroll = v;
-					await this.plugin.saveSettings();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Scroll to heading on hover")
-			.setDesc(
-				"Temporarily scroll to a heading while its TOC row is hovered, then return when the pointer leaves. Click the row to navigate normally and stay there.",
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.scrollToHeadingOnHover).onChange(async (v) => {
-					this.plugin.settings.scrollToHeadingOnHover = v;
-					await this.plugin.saveSettings();
-				}),
-			);
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [...this.basicItems(), this.advancedPage()];
 	}
 
-	// ---- mobile ------------------------------------------------------------
+	/**
+	 * The root page: the settings worth deciding once, on the way in.
+	 *
+	 * Short enough that collapsing it would cost a click to see seven rows,
+	 * which is why only the advanced page has collapsible groups.
+	 */
+	private basicItems(): SettingDefinitionItem[] {
+		return [
+			{
+				name: "Show",
+				desc: "Which content to surface: headings, open tasks, or both.",
+				control: {
+					type: "dropdown",
+					key: "show",
+					options: { both: "Both", headings: "Headings", tasks: "Tasks" },
+				},
+			},
+			{
+				name: "Outline mode",
+				desc: "Unified shows one nested tree with tasks and lists under their heading. Separate tabs keeps the original Headings and Tasks split.",
+				aliases: ["tree", "tabs"],
+				control: {
+					type: "dropdown",
+					key: "outlineMode",
+					options: { unified: "Unified tree", tabs: "Separate tabs" },
+				},
+			},
+			{
+				name: "Side",
+				desc: "Which edge of the note to dock the TOC on.",
+				aliases: ["left", "right"],
+				control: {
+					type: "dropdown",
+					key: "side",
+					options: { right: "Right", left: "Left" },
+				},
+			},
+			{
+				name: "Open the popover on",
+				desc: "Hover over the minimap, or require a click to open. Touch always taps.",
+				aliases: ["hover", "click", "trigger"],
+				control: {
+					type: "dropdown",
+					key: "openTrigger",
+					options: { hover: "Hover", click: "Click" },
+				},
+			},
+			{
+				name: "Show minimap",
+				desc: "Show the dashed markers along the edge of the note.",
+				aliases: ["markers", "dashes"],
+				control: { type: "toggle", key: "showMinimap" },
+			},
+			{
+				name: "Note header button",
+				desc: "Add a button to the note header that opens the outline. On a phone the edge markers are too narrow to tap, so this is the way in.",
+				aliases: ["mobile", "phone", "toolbar"],
+				control: {
+					type: "dropdown",
+					key: "headerButton",
+					options: { auto: "On mobile only", always: "Always", never: "Never" },
+				},
+			},
+			{
+				name: "Hide minimap on phones",
+				desc: "Hide the dashed edge markers on phone-sized screens, where they are too narrow to hit reliably. Tablets keep them.",
+				aliases: ["mobile", "phone"],
+				control: { type: "toggle", key: "hideMinimapOnPhone" },
+			},
+		];
+	}
 
-	private addMobileSection(containerEl: HTMLElement): void {
-		new Setting(containerEl).setName("Mobile").setHeading();
+	private advancedPage(): SettingDefinitionItem {
+		return {
+			type: "page",
+			name: "Advanced",
+			desc: "Content filters, text clean-up, minimap size and popover behavior.",
+			items: [
+				this.group("content", "Content", this.contentItems()),
+				this.group("appearance", "Appearance", this.appearanceItems()),
+				this.group("minimap", "Minimap", this.minimapItems()),
+				this.group("behavior", "Behavior", this.behaviorItems()),
+			],
+		};
+	}
 
-		new Setting(containerEl)
-			.setName("Note header button")
-			.setDesc(
-				"Add a button to the note header that opens the outline. On a phone the edge markers are too narrow to tap, so this is the way in.",
-			)
-			.addDropdown((d) =>
-				d
-					.addOption("auto", "On mobile only")
-					.addOption("always", "Always")
-					.addOption("never", "Never")
-					.setValue(this.plugin.settings.headerButton)
-					.onChange(async (v) => {
-						this.plugin.settings.headerButton = v as TocHeaderButton;
-						await this.plugin.saveAndRefresh();
-					}),
-			);
+	private contentItems(): SettingGroupItem[] {
+		return [
+			{
+				name: "List items",
+				desc: "Include plain bullets and numbered items, not just checkboxes. Long notes can produce a lot of rows, so this starts off.",
+				aliases: ["bullets", "numbered"],
+				control: {
+					type: "dropdown",
+					key: "listItems",
+					options: { none: "None", top: "Top level only", all: "All" },
+				},
+			},
+			{
+				name: "Callouts",
+				desc: "Include callout headers, such as a note or warning title, as outline rows.",
+				control: { type: "toggle", key: "showCallouts" },
+			},
+			{
+				name: "Task statuses",
+				desc: "Which checkbox statuses appear in the outline. Only an unchecked task can be completed from the popover.",
+				aliases: ["checkbox", "done", "cancelled"],
+			},
+			...STATUS_ORDER.map((key) => ({
+				name: STATUS_LABELS[key],
+				aliases: ["task status"],
+				control: { type: "toggle" as const, key: `status:${key}` },
+			})),
+			{
+				name: "Minimum heading level",
+				desc: "Lowest heading level to show (1 = H1).",
+				aliases: ["h1", "level"],
+				control: { type: "slider", key: "minLevel", min: 1, max: 6, step: 1 },
+			},
+			{
+				name: "Maximum heading level",
+				desc: "Highest heading level to show (6 = H6).",
+				aliases: ["h6", "level"],
+				control: { type: "slider", key: "maxLevel", min: 1, max: 6, step: 1 },
+			},
+		];
+	}
 
-		new Setting(containerEl)
-			.setName("Hide minimap on phones")
-			.setDesc(
-				"Hide the dashed edge markers on phone-sized screens, where they are too narrow to hit reliably. Tablets keep them.",
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.hideMinimapOnPhone).onChange(async (v) => {
-					this.plugin.settings.hideMinimapOnPhone = v;
-					await this.plugin.saveAndRefresh();
-				}),
-			);
+	private appearanceItems(): SettingGroupItem[] {
+		return [
+			{
+				name: "Clean up Markdown",
+				desc: "Show heading and task text as a reader would see it, resolving links and removing formatting marks.",
+				aliases: ["strip", "formatting", "links"],
+				control: { type: "toggle", key: "stripMarkdown" },
+			},
+			{
+				name: "Hide tags",
+				desc: "Also remove tags from the text shown in the outline.",
+				control: { type: "toggle", key: "stripTags" },
+			},
+			{
+				name: "Show multiple lines",
+				desc: "Wrap long headings and tasks over as many lines as they need. When off, each row is cut to a single line and hovering it shows the full text.",
+				aliases: ["wrap", "truncate"],
+				control: { type: "toggle", key: "multiLine" },
+			},
+			{
+				name: "Show task checkboxes",
+				desc: "Add a checkbox to each task in the popover; clicking it completes the task in the note.",
+				control: { type: "toggle", key: "showTaskCheckboxes" },
+			},
+			{
+				name: "Collapsible rows",
+				desc: "Allow folding a heading or task to hide the rows nested under it.",
+				aliases: ["fold"],
+				control: { type: "toggle", key: "collapsible" },
+			},
+			{
+				name: "Popover width",
+				desc: "Set the width of the TOC popover in pixels (264 is the default).",
+				control: { type: "slider", key: "popoverWidth", min: 160, max: 480, step: 8 },
+			},
+			{
+				// Rendered imperatively: the reset-to-theme affordance is an extra
+				// button on the row, which the declarative control shapes cannot
+				// express. Still carries name/desc, so it stays searchable.
+				name: "Active tab color",
+				desc: "Background of the selected tab in the popover. Reset to follow the theme.",
+				aliases: ["highlight", "accent"],
+				render: (setting) => {
+					setting
+						.addColorPicker((c) =>
+							c
+								.setValue(
+									(this.getControlValue("activeTabBgColor") as string) ||
+										FALLBACK_ACTIVE_TAB_BG,
+								)
+								.onChange((v) => this.setControlValue("activeTabBgColor", v)),
+						)
+						.addExtraButton((b) =>
+							b
+								.setIcon("rotate-ccw")
+								.setTooltip("Use the theme's color")
+								.onClick(() => {
+									this.setControlValue("activeTabBgColor", "");
+									this.update();
+								}),
+						);
+				},
+			},
+			{
+				name: "Default tab",
+				desc: "Tab shown first in the popover. After that the last-used tab is kept; it always falls back to the tab that has content.",
+				// Only meaningful when the popover actually has tabs.
+				visible: () => this.plugin.settings.outlineMode === "tabs",
+				control: {
+					type: "dropdown",
+					key: "defaultTab",
+					options: { headings: "Headings", tasks: "Tasks" },
+				},
+			},
+		];
+	}
+
+	private minimapItems(): SettingGroupItem[] {
+		return [
+			{
+				name: "Minimap marker width",
+				desc: "Scale the dashed markers (100% is the default).",
+				control: {
+					type: "slider",
+					key: "minimapWidthScale",
+					min: 50,
+					max: 200,
+					step: 10,
+					displayFormat: (v: number) => `${v}%`,
+				},
+			},
+			{
+				name: "Minimap vertical scale",
+				desc: "Scale marker thickness and spacing to make the minimap shorter or taller (100% is the default size).",
+				control: {
+					type: "slider",
+					key: "minimapVerticalScale",
+					min: 50,
+					max: 200,
+					step: 10,
+					displayFormat: (v: number) => `${v}%`,
+				},
+			},
+			{
+				name: "Show tasks in minimap",
+				desc: "Show the open-task count on the edge of the note, next to the dashed markers. Notes with tasks but no headings always show it, so the TOC stays reachable.",
+				control: { type: "toggle", key: "showTasksInMinimap" },
+			},
+		];
+	}
+
+	private behaviorItems(): SettingGroupItem[] {
+		return [
+			{
+				name: "Close delay",
+				desc: "How long the popover waits before closing after the mouse leaves it, in milliseconds. Raise it if it closes on you while switching tabs.",
+				control: {
+					type: "slider",
+					key: "closeDelay",
+					min: 0,
+					max: 1000,
+					step: 20,
+					displayFormat: (v: number) => `${v} ms`,
+				},
+			},
+			{
+				name: "Smooth scroll",
+				desc: "Animate the scroll when navigating to a heading.",
+				control: { type: "toggle", key: "smoothScroll" },
+			},
+			{
+				name: "Scroll to heading on hover",
+				desc: "Temporarily scroll to a heading while its TOC row is hovered, then return when the pointer leaves. Click the row to navigate normally and stay there.",
+				aliases: ["preview"],
+				control: { type: "toggle", key: "scrollToHeadingOnHover" },
+			},
+		];
 	}
 }
