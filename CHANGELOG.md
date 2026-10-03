@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.7.5-beta.1
+
+Removes dead code and stale references. No behaviour change, no settings UI
+change, no overlay change — the plugin does exactly what 0.7.4 did.
+
+### Removed
+
+- **`isFoldable()`** (`src/outline.ts`) — referenced nowhere; folding is done in
+  `overlay.ts`. A leftover from the 0.6.0 outline refactor.
+- **`HeadingItem`, `TaskItem`** (`src/types.ts`) — the pre-0.6.0 outline shapes,
+  replaced by `OutlineNode`.
+- **`listMaxDepth`** — a setting nothing read: not the plugin, not the settings
+  UI, not the tests (which excluded it by name as a known gap). It was still
+  written into every user's `data.json` and advertised depth limiting that does
+  not exist. Existing data files keep a harmless orphan key. Implementing depth
+  limiting would be a feature, not a cleanup; if it is wanted, the key comes
+  back with the feature.
+- **`sim/settings-mockup.html`** — a 290-line design mockup nothing referenced.
+- **`IconName`, and three unused stub classes** in the harness/test stubs.
+- **A dead harness CSS rule** (`.frame.is-tablet` — no code applies the class),
+  an unused `addAction(icon, …)` parameter in the harness, and the **`tslib`**
+  devDependency (no file imports it; the build only type-checks and lets esbuild
+  inline its own helpers).
+- Seven types that were exported but used only inside their own file now stay
+  private: the compiler then guards them for free.
+
+### Fixed
+
+- `README.md` pointed BRAT at `xupisco/obisidian-suble-toc` — the upstream repo
+  (not a fork's build), with a typo that only worked because GitHub
+  case-corrects it. The URL is now upstream's canonical one, with a line telling
+  fork testers to paste their own URL.
+- `TESTING.md` cited "Phase 4/5 of `PLAN.md`", a file that is not in the
+  repository.
+
+### Added
+
+- `tests/hygiene.test.ts`, two guards against the ways dead code accumulated
+  here. Both are deliberate about being conservative and both fail loudly if
+  their own scan breaks:
+  - **No stylesheet ships a class the plugin cannot produce.** Collects the
+    `subtle-toc-*` classes styled in `styles.css` and the ones `src/` can emit —
+    literals plus the prefixes behind template-built names like
+    `subtle-toc-level-${level}` — parsing with TypeScript rather than pattern
+    matching. Prefixes keep the guard from needing an edit every time a status
+    is added, and the parser keeps it honest: the two hand-rolled earlier
+    attempts (a regex, then a scanner) both found *nothing* and passed.
+  - **No module exports something nothing imports.** `tsc --noUnusedLocals`
+    cannot see this — the compiler takes an `export` as evidence of a consumer —
+    which is how an unused function and two dead interfaces sat in `src/`. There
+    is an `ALLOWED_UNUSED` map with a reason per entry, and a companion test that
+    fails if an allow-listed symbol stops being exported.
+
+### Testing
+
+- 74 unit tests (71 before), 479 browser assertions, build clean.
+- Each new guard was verified to fail when it should: a stylesheet rule for a
+  class nothing emits, and a re-added unreferenced export, each produce a failing
+  test naming the offending symbol.
+- `tsc --noUnusedLocals --noUnusedParameters` is now silent across `src/` **and**
+  the harness, which it was not before.
+
 ## 0.7.4-beta.1
 
 Puts the caret on the right-hand side of the Advanced page's group rows, and
