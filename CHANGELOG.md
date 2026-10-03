@@ -19,7 +19,7 @@ and `src/types.ts` are byte-identical to 0.6.0-beta.1.
 - **Rebuilt on Obsidian's declarative settings API** (`getSettingDefinitions()`).
   Settings now appear in Obsidian's global settings search — typing "minimap"
   in the settings search finds them. This is why `minAppVersion` moves to
-  **1.13.1**: the API does not exist before 1.13, and on 1.13+ the framework
+  **1.13.0**: the API does not exist before 1.13, and on 1.13+ the framework
   bypasses `display()` entirely, so there is no partial migration.
 - The Mobile group is gone: both of its settings were promoted to the root page.
 

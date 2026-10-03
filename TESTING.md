@@ -20,7 +20,7 @@ Copy `main.js`, `manifest.json` and `styles.css` into:
 Then reload Obsidian and enable **Subtle TOC**. For the phone, sync that folder
 the way you normally sync your vault.
 
-> **Requires Obsidian 1.13.1 or newer.** The settings tab is built on the
+> **Requires Obsidian 1.13.0 or newer.** The settings tab is built on the
 > declarative API added in 1.13, and Obsidian will refuse to load the plugin
 > below that version. `0.6.0-beta.1` remains installable if you need to go back.
 
