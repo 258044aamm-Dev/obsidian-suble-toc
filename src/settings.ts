@@ -152,7 +152,7 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 		const rowEl = setting.settingEl;
 		const listEl = group?.listEl;
 
-		rowEl.addClass("subtle-toc-group-header");
+		rowEl.addClass("subtle-toc-settings-group-header");
 
 		if (!listEl) {
 			// Nothing to scope the hide to. Leave the group open rather than
@@ -161,8 +161,8 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 			return;
 		}
 
-		listEl.addClass("subtle-toc-group-list");
-		if (!listEl.id) listEl.id = `subtle-toc-group-${id}`;
+		listEl.addClass("subtle-toc-settings-group-list");
+		if (!listEl.id) listEl.id = `subtle-toc-settings-group-${id}`;
 		rowEl.setAttribute("role", "button");
 		rowEl.setAttribute("aria-controls", listEl.id);
 		rowEl.tabIndex = 0;
@@ -210,7 +210,7 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 		return {
 			type: "group",
 			// No `heading`: the first item is the header row instead.
-			cls: `subtle-toc-group subtle-toc-group--${id}`,
+			cls: `subtle-toc-settings-group subtle-toc-settings-group--${id}`,
 			items: [this.headerRow(id), ...items],
 		};
 	}

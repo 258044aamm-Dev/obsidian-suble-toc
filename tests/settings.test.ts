@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubtleTocSettingTab } from "../src/settings";
 import { DEFAULT_SETTINGS, SubtleTocSettings, TaskStatusKey } from "../src/types";
@@ -74,6 +77,25 @@ describe("definition tree", () => {
 		expect(pages).toHaveLength(1);
 		expect(pages[0].name).toBe("Advanced");
 		expect(pages[0].items.every((g: AnyDef) => g.type === "group")).toBe(true);
+	});
+
+	it("never reuses an overlay class name in the settings tab", () => {
+		// 0.7.0 put `subtle-toc-group` on every settings group. That class
+		// already belonged to the overlay's edge container, which styles.css
+		// lays out as `display: flex`, so every settings group silently
+		// inherited flex layout and shrank to the width of its longest label.
+		// Neither the type system nor the stylesheet can catch that, so it is
+		// asserted here: the two namespaces stay disjoint.
+		const root = path.resolve(fileURLToPath(import.meta.url), "../..");
+		const classesIn = (f: string) =>
+			new Set(readFileSync(path.join(root, f), "utf8").match(/subtle-toc-[a-z-]+/g) ?? []);
+
+		const settings = classesIn("src/settings.ts");
+		const overlay = new Set([...classesIn("src/overlay.ts"), ...classesIn("src/dom.ts")]);
+
+		expect(settings.size).toBeGreaterThan(0);
+		expect(overlay.size).toBeGreaterThan(0);
+		expect([...settings].filter((c) => overlay.has(c))).toEqual([]);
 	});
 
 	it("heads each group with a row, not Obsidian's section heading", () => {

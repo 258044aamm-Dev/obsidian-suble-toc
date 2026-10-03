@@ -1,4 +1,4 @@
-# Device test checklist — 0.7.1-beta.1
+# Device test checklist — 0.7.2-beta.1
 
 What I verified in the simulation harness, and what only a real device can tell
 us. Everything in §1 is already automated (`node verify.mjs`, 48 assertions);
@@ -103,6 +103,9 @@ The harness mocks Obsidian, so these are the things it genuinely cannot prove.
 - [ ] Tapping **Advanced** opens a sub-page, and there is a way back
 - [ ] The four groups read as **rows**, the same weight as the Advanced row —
       not as large bold section headings
+- [ ] Each group row spans the **full width** of the settings pane
+- [ ] The four group rows have a faint background tint distinguishing them
+      from the settings inside them
 - [ ] All four groups on it start **collapsed**
 - [ ] Tapping a group header — not just the chevron — expands it, and the
       chevron flips

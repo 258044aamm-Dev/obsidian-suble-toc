@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.7.2-beta.1
+
+Fixes the width of the group rows on the Advanced page. Settings UI only — no
+change to the outline, the overlay, the basic page, or any default.
+
+### Fixed
+
+- **Group rows rendered at a fraction of the pane width.** Every settings group
+  was given the class `subtle-toc-group`, which the *overlay* already owns: it
+  is the flex row that holds the minimap and the popover against the edge of a
+  note (`styles.css:32`, `display: flex; align-items: center; gap: 8px`). The
+  settings tab silently inherited that layout, so each group shrank to the
+  width of its longest label instead of filling the pane. Every settings class
+  is now namespaced `subtle-toc-settings-`, and the header states its own width
+  rather than trusting a container Obsidian owns.
+
+### Added
+
+- A background tint on the four group headers, from `--background-secondary`,
+  so they read as dividers between the settings rather than as more settings.
+  Being a theme variable it follows light/dark and any installed theme.
+- A regression guard: `tests/settings.test.ts` asserts the set of class names
+  `settings.ts` emits never intersects those from `overlay.ts`/`dom.ts`. This
+  is the test that would have caught the bug in 0.7.0 — neither the type system
+  nor the stylesheet can see a collision like it.
+
+### Unchanged
+
+Groups still start collapsed, still toggle independently with several open at
+once, and still reset when the settings window closes without ever being
+written to `data.json`. All 27 setting keys keep their names, types and
+defaults. The overlay keeps `subtle-toc-group` and none of its rules changed.
+
+### Testing
+
+- The browser probe now renders **both** plausible structures for Obsidian's
+  group markup — header inside the list element, and header as a sibling of it
+  — and runs every assertion against each, because the real markup belongs to
+  Obsidian and the harness cannot observe it.
+- Width is measured against the container's content box rather than read off a
+  CSS property, since the defect came from an inherited `display: flex` on an
+  ancestor that no property on the row itself would reveal.
+- 90 browser assertions and 69 unit tests. Restoring the collision fails 10 of
+  them; restoring the class name fails the guard.
+
 ## 0.7.1-beta.1
 
 Fixes the Advanced page's group headers. Settings UI only — no change to the

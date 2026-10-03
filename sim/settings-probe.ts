@@ -96,35 +96,58 @@ const tab = new SubtleTocSettingTab({} as never, plugin as never);
 const defs = tab.getSettingDefinitions() as AnyDef[];
 const page = defs.find((d) => d.type === "page")!;
 
-/** Render the advanced page the way the framework would, structurally. */
-function renderPage(opts: { withListEl: boolean }) {
+/**
+ * Render the advanced page the way the framework would, structurally.
+ *
+ * Obsidian owns this markup and the harness cannot see it, so rather than bet
+ * on one layout both plausible shapes are rendered and every assertion runs
+ * against each:
+ *
+ *   A  the header sits inside the group's list element, with the other rows
+ *   B  the header is a direct child of the group container, a sibling of the
+ *      list element
+ *
+ * The group container always carries the real `cls` string and the page loads
+ * the real stylesheet, so if a settings class ever collides with an overlay
+ * class again, overlay layout lands here and the width assertions fail.
+ */
+function renderPage(opts: { withListEl?: boolean; shape?: "A" | "B" } = {}) {
+	const { withListEl = true, shape = "A" } = opts;
 	root.empty();
 	for (const group of page.items as AnyDef[]) {
 		const groupEl = document.createElement("div");
 		groupEl.className = group.cls ?? "";
 		root.appendChild(groupEl);
 
-		const listEl = document.createElement("div");
-		groupEl.appendChild(listEl);
-
 		const [header, ...rest] = group.items as AnyDef[];
 
-		// The header is the group's first item, rendered imperatively.
-		const headerSetting = fakeSetting(listEl, header.name);
-		header.render(headerSetting, opts.withListEl ? { listEl } : undefined);
+		let listEl: HTMLElement;
+		let headerSetting: Record<string, any>;
+
+		if (shape === "A") {
+			listEl = document.createElement("div");
+			groupEl.appendChild(listEl);
+			headerSetting = fakeSetting(listEl, header.name);
+		} else {
+			headerSetting = fakeSetting(groupEl, header.name);
+			listEl = document.createElement("div");
+			groupEl.appendChild(listEl);
+		}
+
+		header.render(headerSetting, withListEl ? { listEl } : undefined);
 
 		// The remaining items are ordinary rows the framework would draw.
 		for (const item of rest) fakeSetting(listEl, item.name);
 	}
 }
 
-renderPage({ withListEl: true });
+renderPage();
 
 function rowsOf(groupId: string) {
-	const groupEl = document.querySelector(`.subtle-toc-group--${groupId}`)!;
+	const groupEl = document.querySelector(`.subtle-toc-settings-group--${groupId}`)!;
 	return [...groupEl.querySelectorAll<HTMLElement>(".setting-item")].map((el) => ({
 		name: el.querySelector(".setting-item-name")?.textContent ?? "",
-		isHeader: el.classList.contains("subtle-toc-group-header"),
+		isHeader: el.classList.contains("subtle-toc-settings-group-header"),
 		visible: getComputedStyle(el).display !== "none",
 	}));
 }
@@ -133,14 +156,38 @@ function rowsOf(groupId: string) {
 	renderPage,
 	rowsOf,
 	groupIds: ["content", "appearance", "minimap", "behavior"],
-	headerOf: (id: string) =>
-		document.querySelector<HTMLElement>(`.subtle-toc-group--${id} .subtle-toc-group-header`),
-	chevronOf: (id: string) =>
-		document.querySelector<HTMLElement>(
-			`.subtle-toc-group--${id} .subtle-toc-group-header .clickable-icon`,
-		),
-	listOf: (id: string) =>
-		document.querySelector<HTMLElement>(`.subtle-toc-group--${id} .subtle-toc-group-list`),
+	/**
+	 * Row widths against the width the container gives a full-width row.
+	 *
+	 * Measured, not read off a CSS property: the bug shrank rows through an
+	 * inherited `display: flex` on an ancestor, which no property on the row
+	 * itself would have revealed. `available` comes from the container's own
+	 * content box -- an earlier version appended a probe element and measured
+	 * that, which reported 0 inside a flex row because the probe became a flex
+	 * item and collapsed, failing the assertion for the wrong reason.
+	 */
+	widthOf: (id: string) => {
+		const groupEl = document.querySelector<HTMLElement>(
+			`.subtle-toc-settings-group--${id}`,
+		)!;
+		const header = groupEl.querySelector<HTMLElement>(".subtle-toc-settings-group-header")!;
+		const cs = getComputedStyle(groupEl);
+		const available =
+			groupEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+		// Visible rows only -- a collapsed row is display:none and measures 0,
+		// which would fail the width assertion for the wrong reason.
+		const rows = [...groupEl.querySelectorAll<HTMLElement>(".setting-item")].filter(
+			(r) => getComputedStyle(r).display !== "none",
+		);
+		return {
+			header: Math.round(header.getBoundingClientRect().width),
+			available: Math.round(available),
+			// Every row, so a fix that widens the header while squashing the
+			// settings underneath it cannot pass.
+			narrowest: Math.round(Math.min(...rows.map((r) => r.getBoundingClientRect().width))),
+			tint: getComputedStyle(header).backgroundColor,
+		};
+	},
 	/** Clears the in-memory expanded set the way closing settings does. */
 	closeSettings: () => tab.hide(),
 };
