@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en" class="theme-dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Subtle TOC — simulation harness</title>
+		<link rel="stylesheet" href="./sim.css" />
+		<link rel="stylesheet" href="./styles.css" />
+	</head>
+	<body>
+		<header class="bar">
+			<strong>Subtle TOC</strong>
+			<span class="muted">simulation harness — the real overlay against a mock Obsidian API</span>
+		</header>
+
+		<div class="layout">
+			<aside class="panel">
+				<h2>Device</h2>
+				<label
+					>Profile
+					<select id="device">
+						<option value="desktop">Desktop</option>
+						<option value="tablet">Tablet</option>
+						<option value="phone">Phone</option>
+					</select>
+				</label>
+
+				<h2>Content</h2>
+				<label
+					>Outline mode
+					<select id="outlineMode">
+						<option value="unified">Unified tree</option>
+						<option value="tabs">Separate tabs</option>
+					</select>
+				</label>
+				<label
+					>Show
+					<select id="show">
+						<option value="both">Both</option>
+						<option value="headings">Headings</option>
+						<option value="tasks">Tasks</option>
+					</select>
+				</label>
+				<label
+					>List items
+					<select id="listItems">
+						<option value="none">None</option>
+						<option value="top">Top level only</option>
+						<option value="all">All</option>
+					</select>
+				</label>
+				<label class="check"><input type="checkbox" id="allStatuses" /> All task statuses</label>
+				<label class="check"><input type="checkbox" id="showCallouts" /> Callouts</label>
+
+				<h2>Appearance</h2>
+				<label class="check"
+					><input type="checkbox" id="stripMarkdown" checked /> Clean up Markdown</label
+				>
+				<label class="check"><input type="checkbox" id="stripTags" /> Hide tags</label>
+				<label class="check"><input type="checkbox" id="multiLine" checked /> Multiple lines</label>
+				<label class="check"><input type="checkbox" id="collapsible" checked /> Collapsible</label>
+				<label class="check"
+					><input type="checkbox" id="showTaskCheckboxes" /> Task checkboxes</label
+				>
+				<label
+					>Side
+					<select id="side">
+						<option value="right">Right</option>
+						<option value="left">Left</option>
+					</select>
+				</label>
+				<label
+					>Header button
+					<select id="headerButton">
+						<option value="auto">On mobile only</option>
+						<option value="always">Always</option>
+						<option value="never">Never</option>
+					</select>
+				</label>
+
+				<h2>Actions</h2>
+				<div class="row">
+					<button id="open">Open</button>
+					<button id="close">Close</button>
+				</div>
+				<p class="hint">
+					On desktop, hover the dashed strip on the edge of the note. On phone, use the button in
+					the note header.
+				</p>
+				<pre id="readout" class="readout"></pre>
+			</aside>
+
+			<main class="stage">
+				<div class="frame is-desktop" id="frame">
+					<div class="view-header">
+						<div class="view-header-title">Quarterly review</div>
+						<div class="view-actions" id="header-actions"></div>
+					</div>
+					<div class="markdown-source-view mod-cm6" id="note-content">
+						<div class="cm-scroller" id="note-scroll">
+							<div class="cm-content" id="note-lines"></div>
+						</div>
+					</div>
+				</div>
+			</main>
+		</div>
+
+		<script src="./sim.js"></script>
+	</body>
+</html>

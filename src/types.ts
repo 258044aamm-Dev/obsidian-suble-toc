@@ -17,10 +17,57 @@ export interface TaskItem {
 /** A navigable target: enough for scrollToTarget to scroll/flash it. */
 export type NavTarget = { text: string; line: number };
 
+/** What an outline row was built from. */
+export type NodeKind = "heading" | "task" | "list" | "callout";
+
+/** Canonical task statuses, mapped from the raw checkbox character. */
+export type TaskStatusKey =
+	| "todo"
+	| "done"
+	| "inProgress"
+	| "cancelled"
+	| "forwarded"
+	| "question"
+	| "important"
+	| "other";
+
+/**
+ * One row of the outline. Headings, tasks, bullets and callouts are all the
+ * same shape, which is what lets a single renderer, a single navigation path
+ * and a single keyboard walk serve all of them.
+ */
+export interface OutlineNode {
+	/** Stable within one build; used as a DOM reconciliation key. */
+	id: string;
+	kind: NodeKind;
+	/** Visual nesting depth, normalised across kinds. */
+	depth: number;
+	/** Heading level 1-6, list indent width, or 0 for callouts. */
+	rawLevel: number;
+	/** Display text, with Markdown reduced to what a reader would see. */
+	text: string;
+	/** The original Markdown, kept for tooltips and future search. */
+	rawText: string;
+	/** 0-based line number in the document. */
+	line: number;
+	/** Raw checkbox character for tasks, e.g. `" "`, `"x"`, `"/"`. */
+	status?: string;
+	/** Canonical status for tasks. */
+	statusKey?: TaskStatusKey;
+	children: OutlineNode[];
+	parent: OutlineNode | null;
+}
+
 export type TocSide = "right" | "left";
 export type TocTrigger = "hover" | "click";
 export type TocShow = "headings" | "tasks" | "both";
 export type TocDefaultTab = "headings" | "tasks";
+/** Unified tree, or the original two-tab split. */
+export type TocOutlineMode = "unified" | "tabs";
+/** Which plain list items to surface. */
+export type TocListItems = "none" | "top" | "all";
+/** When to add the note-header button. */
+export type TocHeaderButton = "auto" | "always" | "never";
 
 export interface SubtleTocSettings {
 	/** Which content to surface: headings, open tasks, or both. */
@@ -57,6 +104,32 @@ export interface SubtleTocSettings {
 	activeTabBgColor: string;
 	/** Wrap long headings/tasks over several lines instead of cutting them. */
 	multiLine: boolean;
+
+	// ---- outline model ------------------------------------------------------
+
+	/** One nested tree, or the original separate Headings / Tasks tabs. */
+	outlineMode: TocOutlineMode;
+	/** Which plain bullets and numbered items to include. */
+	listItems: TocListItems;
+	/** Deepest list nesting level to render (counted from the list root). */
+	listMaxDepth: number;
+	/** Task statuses to surface. */
+	taskStatuses: TaskStatusKey[];
+	/** Include callout headers (`> [!note] Title`) as outline rows. */
+	showCallouts: boolean;
+	/** Reduce inline Markdown to plain text in outline rows. */
+	stripMarkdown: boolean;
+	/** Also remove `#tags` from the displayed text. */
+	stripTags: boolean;
+	/** Allow folding a row's children. */
+	collapsible: boolean;
+
+	// ---- platform -----------------------------------------------------------
+
+	/** Add a button to the note header that opens the outline. */
+	headerButton: TocHeaderButton;
+	/** Hide the edge minimap on phones, where it is too narrow to tap. */
+	hideMinimapOnPhone: boolean;
 }
 
 export const DEFAULT_SETTINGS: SubtleTocSettings = {
@@ -77,4 +150,18 @@ export const DEFAULT_SETTINGS: SubtleTocSettings = {
 	showTaskCheckboxes: false,
 	activeTabBgColor: "",
 	multiLine: true,
+
+	outlineMode: "unified",
+	// Off by default: a meeting-notes page can carry 150+ bullets, and the
+	// outline should stay an outline until the user asks for more.
+	listItems: "none",
+	listMaxDepth: 2,
+	taskStatuses: ["todo"],
+	showCallouts: false,
+	stripMarkdown: true,
+	stripTags: false,
+	collapsible: true,
+
+	headerButton: "auto",
+	hideMinimapOnPhone: true,
 };

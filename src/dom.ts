@@ -1,6 +1,6 @@
-import { MarkdownView } from "obsidian";
+import { App, MarkdownView } from "obsidian";
 import { EditorView } from "@codemirror/view";
-import { HeadingItem, NavTarget } from "./types";
+import { NavTarget } from "./types";
 
 /** Pixels below the viewport top a heading must cross to count as "active". */
 const ACTIVE_THRESHOLD = 60;
@@ -239,7 +239,7 @@ function openTaskCheckboxCh(text: unknown): number {
  * editor is a detached buffer whose edits don't persist, so the file is written
  * directly instead. Returns false if that line isn't an open task.
  */
-export function completeTask(view: MarkdownView, line: number): boolean {
+export function completeTask(app: App, view: MarkdownView, line: number): boolean {
 	try {
 		if (view.getMode() !== "preview") {
 			const editor = view.editor;
@@ -254,7 +254,7 @@ export function completeTask(view: MarkdownView, line: number): boolean {
 		// Reading mode (or no editor): rewrite the file atomically.
 		const file = view.file;
 		if (!file || openTaskCheckboxCh(view.getViewData().split("\n")[line]) < 0) return false;
-		void view.app.vault
+		void app.vault
 			.process(file, (data) => {
 				const lines = data.split("\n");
 				const ch = openTaskCheckboxCh(lines[line]);
@@ -269,14 +269,43 @@ export function completeTask(view: MarkdownView, line: number): boolean {
 	}
 }
 
+/** Anything with a document line; headings and outline nodes both qualify. */
+export interface LineItem {
+	line: number;
+}
+
+/**
+ * Largest index whose predicate holds, assuming the predicate is monotonic
+ * (true for a prefix, then false). Returns 0 when nothing matches, matching
+ * the previous linear scan's behaviour of defaulting to the first heading.
+ */
+function lastMatching(length: number, holds: (index: number) => boolean): number {
+	let lo = 0;
+	let hi = length - 1;
+	let best = 0;
+	while (lo <= hi) {
+		const mid = (lo + hi) >> 1;
+		if (holds(mid)) {
+			best = mid;
+			lo = mid + 1;
+		} else {
+			hi = mid - 1;
+		}
+	}
+	return best;
+}
+
 /**
  * Index of the heading whose section is currently in view (the last heading
  * scrolled past). Returns -1 when there are no headings.
+ *
+ * This runs on every animation frame while the note scrolls, so it binary
+ * searches rather than walking the list: headings are sorted by line, and
+ * "has this heading scrolled past the threshold" is monotonic over them. The
+ * previous linear scan called `lineBlockAt` once per heading per frame, which
+ * is measurable on notes with hundreds of headings.
  */
-export function getActiveHeadingIndex(
-	view: MarkdownView,
-	headings: HeadingItem[],
-): number {
+export function getActiveHeadingIndex(view: MarkdownView, headings: LineItem[]): number {
 	if (headings.length === 0) return -1;
 
 	try {
@@ -284,25 +313,21 @@ export function getActiveHeadingIndex(
 			const cm = getEditorView(view);
 			if (cm) {
 				const scrollTop = cm.scrollDOM.scrollTop;
-				let active = 0;
-				for (let i = 0; i < headings.length; i++) {
-					const pos = cm.state.doc.line(headings[i].line + 1).from;
-					const top = cm.lineBlockAt(pos).top;
-					if (top - scrollTop <= ACTIVE_THRESHOLD) active = i;
-					else break;
-				}
-				return active;
+				const doc = cm.state.doc;
+				return lastMatching(headings.length, (i) => {
+					// Defensive: the cache can briefly lead the document while
+					// an edit is being applied, so a line may not exist yet.
+					const lineNo = headings[i].line + 1;
+					if (lineNo < 1 || lineNo > doc.lines) return false;
+					const top = cm.lineBlockAt(doc.line(lineNo).from).top;
+					return top - scrollTop <= ACTIVE_THRESHOLD;
+				});
 			}
 		} else {
 			const mode = getCurrentModeScroll(view);
 			if (mode?.getScroll) {
 				const scrollLine = mode.getScroll();
-				let active = 0;
-				for (let i = 0; i < headings.length; i++) {
-					if (headings[i].line <= scrollLine + 1) active = i;
-					else break;
-				}
-				return active;
+				return lastMatching(headings.length, (i) => headings[i].line <= scrollLine + 1);
 			}
 		}
 	} catch (e) {

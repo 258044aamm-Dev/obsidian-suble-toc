@@ -1,0 +1,266 @@
+/* Obsidian-ish theme variables so the plugin's own styles.css resolves. */
+:root,
+.theme-dark {
+	--background-primary: #1e1e1e;
+	--background-primary-alt: #1a1a1a;
+	--background-secondary: #262626;
+	--background-secondary-alt: #202020;
+	--background-modifier-border: #3a3a3a;
+	--background-modifier-border-hover: #4a4a4a;
+	--background-modifier-border-focus: #6c8cff;
+	--background-modifier-hover: rgba(255, 255, 255, 0.075);
+	--background-modifier-cover: rgba(0, 0, 0, 0.55);
+	--text-normal: #dcddde;
+	--text-muted: #9a9b9e;
+	--text-faint: #6a6c6f;
+	--text-on-accent: #ffffff;
+	--interactive-accent: #7b6cf6;
+	--color-yellow: #e0b445;
+	--color-red: #e05252;
+	--font-ui-smaller: 11px;
+	--font-ui-small: 13px;
+	--font-ui-medium: 15px;
+	--font-semibold: 600;
+	--shadow-s: 0 8px 24px rgba(0, 0, 0, 0.35);
+	--shadow-l: 0 16px 48px rgba(0, 0, 0, 0.45);
+	--layer-popover: 30;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: #141414;
+	color: var(--text-normal);
+	font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.bar {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.muted {
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.layout {
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	padding: 16px;
+}
+
+.panel {
+	flex: 0 0 240px;
+	position: sticky;
+	top: 16px;
+	padding: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background: var(--background-secondary);
+	font-size: 13px;
+}
+
+.panel h2 {
+	margin: 14px 0 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-faint);
+}
+
+.panel h2:first-child {
+	margin-top: 0;
+}
+
+.panel label {
+	display: block;
+	margin-bottom: 6px;
+	color: var(--text-muted);
+}
+
+.panel label.check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.panel select {
+	width: 100%;
+	margin-top: 2px;
+	padding: 4px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+
+.row {
+	display: flex;
+	gap: 6px;
+}
+
+.panel button {
+	flex: 1;
+	padding: 6px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.panel button:hover {
+	background: var(--background-modifier-hover);
+}
+
+.hint {
+	margin: 10px 0 0;
+	color: var(--text-faint);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.readout {
+	margin: 10px 0 0;
+	padding: 8px;
+	border-radius: 6px;
+	background: var(--background-primary);
+	color: var(--text-muted);
+	font-size: 11px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.stage {
+	flex: 1 1 auto;
+	display: flex;
+	justify-content: center;
+}
+
+/* The note frame, sized per device profile. */
+.frame {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background: var(--background-primary);
+	overflow: hidden;
+	transition: width 160ms ease, height 160ms ease;
+}
+
+.frame.is-desktop {
+	width: 820px;
+	height: 720px;
+}
+
+.frame.is-tablet {
+	width: 600px;
+	height: 760px;
+}
+
+.frame.is-phone {
+	width: 390px;
+	height: 760px;
+}
+
+.view-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary-alt);
+}
+
+.view-header-title {
+	font-size: 14px;
+	color: var(--text-normal);
+}
+
+.view-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.view-action {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 6px;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.view-action:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* The note body. `position: relative` comes from the plugin's own
+   .subtle-toc-host class, exactly as it does in Obsidian. */
+.markdown-source-view {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+}
+
+.cm-scroller {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 16px 48px 16px 24px;
+}
+
+.cm-content {
+	max-width: 700px;
+}
+
+.cm-line {
+	font-family: ui-monospace, "SF Mono", Menlo, monospace;
+	font-size: 13px;
+	line-height: 1.7;
+	white-space: pre-wrap;
+	color: var(--text-muted);
+}
+
+.sim-heading {
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+.sim-h1 {
+	font-size: 18px;
+}
+.sim-h2 {
+	font-size: 16px;
+}
+.sim-h3 {
+	font-size: 14px;
+}
+
+.sim-list {
+	color: #b9bbbe;
+}
+
+.sim-callout {
+	color: var(--color-yellow);
+}
+
+/* Obsidian's flash highlight, which the plugin toggles on navigation. */
+.is-flashing {
+	background: rgba(123, 108, 246, 0.25);
+	border-radius: 4px;
+	transition: background 400ms ease;
+}

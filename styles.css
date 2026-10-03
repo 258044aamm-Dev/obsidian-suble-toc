@@ -95,15 +95,15 @@
 }
 
 .subtle-toc-dash.is-active {
-	background: #eee;
+	background: var(--text-normal);
 	opacity: 0.75;
 	width: var(--toc-dash-active-w, 14px);
 }
 
-/* Keep the existing pale active marker in dark mode; use dark gray at full
-   opacity in light mode so it remains clearly visible against the note. */
+/* Both themes use the theme's own foreground so the marker tracks the palette;
+   light mode keeps it at full opacity so it stays clearly visible against the
+   lighter note background. */
 .theme-light .subtle-toc-dash.is-active {
-	background: #444;
 	opacity: 1;
 }
 
@@ -228,10 +228,34 @@
 	transform: translate(0, -50%);
 }
 
+/* Anchored: an explicit `top` replaces the 50% centring, so the vertical half
+   of the transform must go too or the popover would sit half a height high. */
+.subtle-toc-root.is-anchored .subtle-toc-popover {
+	transform: translate(10px, 0);
+}
+
+.subtle-toc-root.is-anchored.is-left .subtle-toc-popover {
+	transform: translate(-10px, 0);
+}
+
+.subtle-toc-root.is-anchored.is-open .subtle-toc-popover,
+.subtle-toc-root.is-anchored.is-left.is-open .subtle-toc-popover {
+	transform: translate(0, 0);
+}
+
+/* The sheet is viewport-centred, so it ignores the anchor entirely. */
+.subtle-toc-root.is-sheet .subtle-toc-popover {
+	top: 50%;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.subtle-toc-popover {
 		transition: opacity 140ms ease;
 		transform: translate(0, -50%);
+	}
+
+	.subtle-toc-root.is-anchored .subtle-toc-popover {
+		transform: translate(0, 0);
 	}
 }
 
@@ -246,8 +270,24 @@
 
 .subtle-toc-tabs {
 	display: flex;
+	align-items: center;
 	gap: 4px;
 	padding: 8px 8px 2px;
+}
+
+/* Unified mode renders a single list, so the tabs would select nothing. The
+   bar itself survives in sheet mode, where it carries the close button. */
+.subtle-toc-root.is-unified .subtle-toc-tab {
+	display: none;
+}
+
+.subtle-toc-root.is-unified:not(.is-sheet) .subtle-toc-tabs {
+	display: none;
+}
+
+.subtle-toc-root.is-unified.is-sheet .subtle-toc-tabs {
+	justify-content: flex-end;
+	padding: 6px 6px 2px;
 }
 
 .subtle-toc-tab.is-hidden {
@@ -318,20 +358,15 @@
 	gap: 1px;
 }
 
-/* Only the active tab's list is shown (the .is-tab-* class lives on the root).
-   Placed after .subtle-toc-list so the equal-specificity `display: none` wins. */
-.subtle-toc-headings,
-.subtle-toc-tasks {
-	display: none;
-}
-
-.subtle-toc-root.is-tab-headings .subtle-toc-headings,
-.subtle-toc-root.is-tab-tasks .subtle-toc-tasks {
-	display: flex;
-}
+/* One list renders every row kind; the active tab filters which nodes reach it
+   (see TocOverlay.accepts), so there is no second container to swap. */
 
 .subtle-toc-item {
 	position: relative;
+	display: flex;
+	/* first-line alignment: row text can wrap to several lines */
+	align-items: flex-start;
+	gap: 5px;
 	padding: 4px 10px 4px 12px;
 	padding-left: calc(12px + var(--toc-indent, 0) * 12px);
 	border-radius: 6px;
@@ -366,6 +401,8 @@
 
 .subtle-toc-item-text {
 	display: block;
+	flex: 1 1 auto;
+	min-width: 0;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -384,58 +421,65 @@
 	font-weight: var(--font-semibold, 600);
 }
 
-/* ---- task rows (optional checkbox + strike-through on completion) --------- */
-
-.subtle-toc-task-item {
-	display: flex;
-	/* first-line alignment: task text can wrap to several lines */
-	align-items: flex-start;
-	gap: 7px;
-}
-
-.subtle-toc-task-item .subtle-toc-item-text {
-	flex: 1 1 auto;
-	min-width: 0;
-}
+/* ---- task rows (status box + strike-through on completion) --------------- */
 
 .subtle-toc-task-check {
 	flex: 0 0 auto;
 	/* nudge onto the first text line */
 	margin-top: 1px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	width: 15px;
 	height: 15px;
 	border: 1.5px solid var(--text-faint);
 	border-radius: 4px;
-	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 11px;
+	line-height: 1;
+	cursor: default;
 	position: relative;
 	transition: border-color 100ms ease, background-color 100ms ease;
 }
 
-.subtle-toc-task-check:hover {
+/* Only an unchecked task can be completed from here; every other status is
+   shown for context, so it must not advertise itself as clickable. */
+.subtle-toc-task-check.is-actionable {
+	cursor: pointer;
+}
+
+.subtle-toc-task-check.is-actionable:hover {
 	border-color: var(--text-muted);
 }
 
-.subtle-toc-task-item.is-done .subtle-toc-task-check {
+/* With checkboxes off, a plain to-do keeps no box at all (the original
+   default); statuses that carry meaning still show theirs. */
+.subtle-toc-task-check.is-hidden {
+	display: none;
+}
+
+.subtle-toc-item.is-done .subtle-toc-task-check,
+.subtle-toc-item.subtle-toc-status-done .subtle-toc-task-check {
 	background: var(--interactive-accent);
 	border-color: var(--interactive-accent);
+	color: var(--text-on-accent, #fff);
 }
 
-/* checkmark drawn with a rotated border */
-.subtle-toc-task-item.is-done .subtle-toc-task-check::after {
-	content: "";
-	position: absolute;
-	left: 4.5px;
-	top: 1px;
-	width: 3.5px;
-	height: 8px;
-	border: solid var(--text-on-accent, #fff);
-	border-width: 0 2px 2px 0;
-	transform: rotate(45deg);
-}
-
-.subtle-toc-task-item.is-done .subtle-toc-item-text {
+.subtle-toc-item.is-done .subtle-toc-item-text,
+.subtle-toc-item.subtle-toc-status-done .subtle-toc-item-text,
+.subtle-toc-item.subtle-toc-status-cancelled .subtle-toc-item-text {
 	text-decoration: line-through;
 	color: var(--text-faint);
+}
+
+.subtle-toc-status-inProgress .subtle-toc-task-check {
+	border-color: var(--color-yellow, var(--text-muted));
+	color: var(--color-yellow, var(--text-muted));
+}
+
+.subtle-toc-status-important .subtle-toc-task-check {
+	border-color: var(--color-red, var(--text-muted));
+	color: var(--color-red, var(--text-muted));
 }
 
 .subtle-toc-empty-msg {
@@ -443,4 +487,224 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-small);
 	text-align: center;
+}
+
+/* ---- fold control -------------------------------------------------------- */
+
+.subtle-toc-twisty {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	/* Reserve the column on every row so text stays aligned whether or not a
+	   row can fold; only a foldable row reveals the chevron. */
+	width: 13px;
+	height: 17px;
+	margin-left: -13px;
+	color: var(--text-faint);
+	opacity: 0;
+	cursor: pointer;
+	transition: opacity 100ms ease, transform 120ms ease;
+}
+
+.subtle-toc-twisty .subtle-toc-icon {
+	width: 11px;
+	height: 11px;
+}
+
+.subtle-toc-item.is-foldable .subtle-toc-twisty {
+	opacity: 0.55;
+	transform: rotate(90deg);
+}
+
+.subtle-toc-item.is-foldable.is-collapsed .subtle-toc-twisty {
+	opacity: 0.8;
+	transform: rotate(0deg);
+}
+
+.subtle-toc-item.is-foldable .subtle-toc-twisty:hover {
+	opacity: 1;
+	color: var(--text-normal);
+}
+
+/* A collapsed row hints at what it is hiding. */
+.subtle-toc-item.is-collapsed .subtle-toc-item-text::after {
+	content: "…";
+	margin-left: 4px;
+	color: var(--text-faint);
+}
+
+/* ---- row kinds ----------------------------------------------------------- */
+
+.subtle-toc-kind-mark {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	margin-top: 2px;
+	color: var(--text-faint);
+}
+
+.subtle-toc-kind-mark .subtle-toc-icon {
+	width: 12px;
+	height: 12px;
+}
+
+/* Plain bullets read as secondary to the headings and tasks around them. */
+.subtle-toc-kind-list > .subtle-toc-item-text {
+	color: var(--text-faint);
+}
+
+.subtle-toc-kind-list:hover > .subtle-toc-item-text {
+	color: var(--text-muted);
+}
+
+.subtle-toc-kind-list > .subtle-toc-item-text::before {
+	content: "•";
+	margin-right: 6px;
+	color: var(--text-faint);
+}
+
+.subtle-toc-kind-callout > .subtle-toc-item-text {
+	font-style: italic;
+}
+
+/* ---- close button (sheet only) ------------------------------------------- */
+
+.subtle-toc-close {
+	display: none;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 6px;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.subtle-toc-close:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-close {
+	display: flex;
+}
+
+/* ---- keyboard focus ------------------------------------------------------ */
+
+.subtle-toc-item:focus-visible,
+.subtle-toc-tab:focus-visible,
+.subtle-toc-close:focus-visible,
+.subtle-toc-task-check:focus-visible {
+	outline: 2px solid var(--background-modifier-border-focus, var(--interactive-accent));
+	outline-offset: 1px;
+	border-radius: 6px;
+}
+
+/* ---- mobile sheet -------------------------------------------------------- */
+
+/* Dismiss layer behind the sheet. Inert until the sheet is open so it never
+   intercepts taps meant for the note. */
+.subtle-toc-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	background: var(--background-modifier-cover, rgba(0, 0, 0, 0.4));
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 140ms ease;
+}
+
+.subtle-toc-root.is-sheet.is-open .subtle-toc-backdrop {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-group {
+	position: static;
+}
+
+/* The sheet detaches from the edge group and centres itself on the note, which
+   is the only layout that gives a finger room to work on a phone. */
+.subtle-toc-root.is-sheet .subtle-toc-popover {
+	position: fixed;
+	z-index: 1;
+	top: 50%;
+	left: 50%;
+	right: auto;
+	width: min(92vw, 420px);
+	max-height: min(70vh, 560px);
+	transform: translate(-50%, -48%);
+	border-radius: 14px;
+	box-shadow: var(--shadow-l, 0 16px 48px rgba(0, 0, 0, 0.45));
+}
+
+.subtle-toc-root.is-sheet.is-open .subtle-toc-popover {
+	transform: translate(-50%, -50%);
+}
+
+/* Touch targets: the 44px minimum applies to anything tappable in the sheet. */
+.subtle-toc-root.is-sheet .subtle-toc-item {
+	min-height: 44px;
+	align-items: center;
+	padding-top: 8px;
+	padding-bottom: 8px;
+	font-size: var(--font-ui-medium, var(--font-ui-small));
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-tab {
+	min-height: 44px;
+}
+
+/* Size only -- the opacity stays with .is-foldable, or every leaf row would
+   sprout a chevron that does nothing. */
+.subtle-toc-root.is-sheet .subtle-toc-twisty {
+	width: 28px;
+	height: 28px;
+	margin-left: -20px;
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-item.is-foldable .subtle-toc-twisty {
+	opacity: 0.7;
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-twisty .subtle-toc-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-task-check {
+	width: 20px;
+	height: 20px;
+	font-size: 13px;
+}
+
+.subtle-toc-root.is-sheet .subtle-toc-list {
+	padding: 6px;
+	gap: 2px;
+}
+
+/* The header button is the only way in on a phone, so it must not inherit the
+   edge group's fade-out when the sheet opens. */
+.subtle-toc-header-button {
+	opacity: 1;
+}
+
+/* Hover styling is meaningless on touch and leaves rows stuck in a hover state
+   after a tap, so restrict it to devices that actually hover. */
+@media (hover: none) {
+	.subtle-toc-item:hover {
+		background: transparent;
+		color: var(--text-muted);
+	}
+
+	.subtle-toc-item:active {
+		background: var(--background-modifier-hover);
+		color: var(--text-normal);
+	}
+
+	.subtle-toc-item.is-active {
+		color: var(--text-normal);
+	}
 }

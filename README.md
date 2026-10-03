@@ -4,14 +4,29 @@ A floating, Capacities-style table of contents for [Obsidian](https://obsidian.m
 
 A discreet dashed **minimap** lives on the edge of your note. Hover (or click) it
 and a **popover outline** slides out — the heading for the section you're reading
-is highlighted, and clicking any heading jumps to it.
+is highlighted, and clicking any heading jumps to it. On mobile, a button in the
+note header opens the same outline as a sheet.
 
-It can also surface the note's **open tasks** in a second tab — with a live count
-and optional one-click completion — while the minimap stays focused on structure.
+The outline is a single nested tree: headings, open tasks, and optionally plain
+list items and callout headers, each sitting under the heading it belongs to.
 
 ## Features
 
 - **Floating popover** overlaid on the note (no sidebar pane needed).
+- **Unified outline tree** — headings, tasks, lists and callouts in one nested
+  view, with sub-tasks under their parent task. The original two-tab split is
+  still available via *Outline mode → Separate tabs*.
+- **Mobile support** — a button in the note header opens the outline as a
+  full-size sheet with touch-sized rows, a backdrop, and a close button.
+- **Collapsible rows** — fold a heading or a task to hide everything under it.
+- **Readable row text** — `## **Done** [[Project X|PX]]` shows as “Done PX”
+  instead of raw Markdown. Tasks-plugin dates and Dataview inline fields are
+  stripped too.
+- **All task statuses** — not just `[ ]`. Choose which of to-do, in progress,
+  done, forwarded, important, question and cancelled appear.
+- **Bullets and numbered lists** *(optional)* — off by default, since a long
+  note can produce a lot of rows.
+- **Callout headers** *(optional)* — `> [!note] Title` as an outline row.
 - **Edge minimap** of dashes, one per heading, sized by heading level.
 - **Active-heading tracking** in both Editing (Live Preview / Source) and Reading mode.
 - **Click to navigate** with optional smooth scroll — works in both modes.
@@ -37,10 +52,22 @@ and optional one-click completion — while the minimap stays focused on structu
 
 ## Settings
 
+Settings are grouped into **Content**, **Appearance**, **Minimap**, **Behavior**
+and **Mobile**.
+
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Show | Both | Surface headings, tasks, or both. |
-| Default tab | Headings | Tab that leads the tab bar and opens first; after that the last-used tab is kept. |
+| Outline mode | Unified tree | One nested tree, or the original separate Headings / Tasks tabs. |
+| List items | None | Include plain bullets and numbered items: none, top level only, or all. |
+| Callouts | Off | Include callout headers as outline rows. |
+| Task statuses | To do | Which checkbox statuses appear. Only an unchecked task can be completed from the popover. |
+| Clean up Markdown | On | Resolve links and strip formatting marks in row text. |
+| Hide tags | Off | Also remove tags from the displayed text. |
+| Collapsible rows | On | Allow folding a row to hide the rows nested under it. |
+| Note header button | On mobile only | Add a button to the note header that opens the outline. |
+| Hide minimap on phones | On | Hide the edge markers on phone-sized screens, where they are too narrow to tap. |
+| Default tab | Headings | *(Separate tabs mode only.)* Tab that leads the tab bar and opens first. |
 | Show task checkboxes | Off | Add a checkbox to each task row to complete it from the popover. |
 | Show multiple lines | On | Wrap long rows; when off, rows are single-line and hovering shows the full text. |
 | Active tab color | *theme* | Background of the selected tab. Reset it to follow the theme. |
@@ -55,6 +82,29 @@ and optional one-click completion — while the minimap stays focused on structu
 | Smooth scroll | On | Animate the scroll when navigating. |
 | Scroll to heading on hover | Off | Temporarily scroll to a hovered heading and return on leave; click to navigate normally and stay there. |
 | Minimum / maximum heading level | 1 / 6 | Heading levels to include (tasks are unaffected). |
+
+## Develop and verify
+
+```bash
+npm install
+npm run dev     # esbuild watch -> rebuilds main.js on change
+npm test        # unit tests for the outline tree and Markdown stripping
+npm run sim     # build the browser simulation harness
+```
+
+The **simulation harness** in `sim/` bundles the real `src/` modules against a
+mock Obsidian API, so the overlay can be driven in a plain browser — including
+the phone and tablet layouts, which are otherwise awkward to iterate on:
+
+```bash
+npm run sim
+npx http-server sim -p 8080 -c-1   # then open http://127.0.0.1:8080
+```
+
+`npm run verify` drives that harness with Playwright and asserts the behaviour
+unit tests cannot reach: layout, pointer interaction, the mobile sheet, folding
+and navigation. See `TESTING.md` for what it covers and what still needs a real
+device.
 
 ## Screenshots
 
