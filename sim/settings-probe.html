@@ -22,6 +22,21 @@
 				font-family: sans-serif;
 				font-size: 14px;
 			}
+			/* ---------------------------------------------------------------
+			   Fixtures for Obsidian's own settings row.
+
+			   These are NOT invented. An earlier version of this file declared
+			   `.setting-item { display: flex }` as a convenience, which quietly
+			   made it impossible for the suite to ever observe a stacked row --
+			   and a stacked row was exactly the bug that reached the user. The
+			   assumption had been encoded as a test fixture.
+
+			   Derived from a device screenshot (Android phone, Obsidian 1.13,
+			   2026-10-03): on mobile a settings row stacks name over control,
+			   flush left, unless it carries a control modifier class. This is an
+			   approximation of Obsidian's stylesheet, good enough to make the
+			   stacking case testable; the device checklist stays the authority.
+			   --------------------------------------------------------------- */
 			.setting-item {
 				display: flex;
 				align-items: center;
@@ -31,6 +46,28 @@
 			}
 			.setting-item-info {
 				margin-right: auto;
+			}
+			.setting-item-control {
+				display: flex;
+				align-items: center;
+				justify-content: flex-end;
+			}
+
+			/* The mobile fixture. A row with no control modifier stacks. */
+			body.is-mobile .setting-item {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 8px;
+				padding: 16px;
+			}
+			body.is-mobile .setting-item-control {
+				width: 100%;
+				justify-content: flex-start;
+			}
+			/* Mobile controls are full touch targets, which is where the tall
+			   band of dead space in the screenshot came from. */
+			body.is-mobile .clickable-icon {
+				min-height: 44px;
 			}
 			.clickable-icon {
 				padding: 4px 8px;

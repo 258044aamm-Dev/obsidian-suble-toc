@@ -1,4 +1,4 @@
-# Device test checklist — 0.7.2-beta.1
+# Device test checklist — 0.7.3-beta.1
 
 What I verified in the simulation harness, and what only a real device can tell
 us. Everything in §1 is already automated (`node verify.mjs`, 48 assertions);
@@ -104,6 +104,9 @@ The harness mocks Obsidian, so these are the things it genuinely cannot prove.
 - [ ] The four groups read as **rows**, the same weight as the Advanced row —
       not as large bold section headings
 - [ ] Each group row spans the **full width** of the settings pane
+- [ ] The caret sits on the **right-hand side** of the group row, on the same
+      line as the title — not underneath it
+- [ ] Group rows are a single row tall, with no empty band below the title
 - [ ] The four group rows have a faint background tint distinguishing them
       from the settings inside them
 - [ ] All four groups on it start **collapsed**

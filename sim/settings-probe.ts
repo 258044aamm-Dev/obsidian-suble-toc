@@ -188,6 +188,48 @@ function rowsOf(groupId: string) {
 			tint: getComputedStyle(header).backgroundColor,
 		};
 	},
+	/**
+	 * Switch between the desktop and mobile fixtures for Obsidian's row.
+	 * `is-mobile` is the real class Obsidian puts on body, so the plugin's own
+	 * mobile rules come along for the ride.
+	 */
+	setFixture: (fixture: "desktop" | "mobile") => {
+		document.body.classList.toggle("is-mobile", fixture === "mobile");
+	},
+
+	/**
+	 * Where the caret sits relative to the title.
+	 *
+	 * Geometry, not CSS properties: the caret dropped below the title through
+	 * a `flex-direction` inherited from Obsidian, and reading properties off
+	 * the plugin's own rules would have shown nothing wrong.
+	 */
+	geometryOf: (id: string) => {
+		const header = document.querySelector<HTMLElement>(
+			`.subtle-toc-settings-group--${id} .subtle-toc-settings-group-header`,
+		)!;
+		const title = header.querySelector<HTMLElement>(".setting-item-name")!;
+		const caret = header.querySelector<HTMLElement>(".clickable-icon")!;
+		const t = title.getBoundingClientRect();
+		const c = caret.getBoundingClientRect();
+		const hs = getComputedStyle(header);
+		return {
+			caretLeft: Math.round(c.left),
+			titleRight: Math.round(t.right),
+			caretMidY: Math.round(c.top + c.height / 2),
+			titleMidY: Math.round(t.top + t.height / 2),
+			rowHeight: Math.round(header.getBoundingClientRect().height),
+			// Padding removed, so the comparison does not depend on how roomy
+			// the platform's rows happen to be. Laid out as a row this is about
+			// max(title, caret); stacked it is title + gap + caret. Comparing it
+			// against the sum discriminates the two without a magic threshold.
+			contentHeight: Math.round(
+				header.clientHeight - parseFloat(hs.paddingTop) - parseFloat(hs.paddingBottom),
+			),
+			stackedHeight: Math.round(t.height + c.height),
+		};
+	},
+
 	/** Clears the in-memory expanded set the way closing settings does. */
 	closeSettings: () => tab.hide(),
 };

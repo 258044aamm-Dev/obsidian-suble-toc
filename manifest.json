@@ -1,7 +1,7 @@
 {
 	"id": "subtle-toc",
 	"name": "Subtle TOC",
-	"version": "0.7.2-beta.1",
+	"version": "0.7.3-beta.1",
 	"minAppVersion": "1.13.0",
 	"description": "A floating, Capacities-style outline: an edge minimap for headings with active tracking and click-to-scroll, a nested tree of headings, tasks, lists and callouts, and a note-header button on mobile.",
 	"author": "Leandro Voltolino",

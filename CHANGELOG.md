@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.7.3-beta.1
+
+Fixes the caret position on the Advanced page's group rows. CSS only — no
+TypeScript changed, no behaviour changed, no default changed.
+
+### Fixed
+
+- **The caret sat below the group title instead of beside it**, flush left,
+  leaving a tall band of dead space in each row. Obsidian's mobile stylesheet
+  lays a settings row out as a column — name on top, control beneath — and only
+  switches back to a horizontal row for rows carrying a control modifier class
+  (toggle, dropdown, slider). A group header is a `render` definition with no
+  control, so it got no modifier class and fell through to the stacked default.
+  The row layout is now stated explicitly instead of inherited.
+
+  Every rule is scoped to `.subtle-toc-settings-group-header` and compounded
+  with `.setting-item`, so it outranks Obsidian's mobile rule on specificity
+  without `!important` and cannot match any other settings row — this plugin's,
+  Obsidian's, or another plugin's.
+
+### Testing
+
+The harness could not previously observe this bug: `sim/settings-probe.html`
+**declared** `.setting-item { display: flex }` itself, so a stacked row was
+impossible by construction. The assumption had been encoded as a test fixture,
+which is why 90 green assertions and a screenshot review all missed it.
+
+- That rule is replaced by two fixtures, a desktop row and a mobile row that
+  stacks, derived from a device screenshot and labelled as an approximation.
+- The whole settings suite now runs across **fixture × shape** — desktop and
+  mobile, in a phone viewport, against both plausible group structures.
+- Three geometric assertions per group that cannot pass while the caret is
+  stacked: the caret is right of the title, shares its line to within 2px, and
+  the row's content is shorter than title + caret stacked (no magic threshold,
+  so it holds on both platforms).
+- Removing the fix reproduces the reported defect in the harness —
+  `caretLeft=40 titleRight=96`, `caretMidY=91 titleMidY=49`, row height 109px —
+  and desktop stays clean. 160 browser assertions, 69 unit tests.
+
 ## 0.7.2-beta.1
 
 Fixes the width of the group rows on the Advanced page. Settings UI only — no

@@ -741,6 +741,36 @@
 	background-color: var(--background-secondary);
 }
 
+/* Obsidian's mobile stylesheet lays a settings row out as a column -- name on
+   top, control beneath, flush left -- and only switches back to a horizontal
+   row for rows carrying a control modifier class (toggle, dropdown, slider).
+   A header row is a `render` definition with no control, so it got no
+   modifier class and fell through to the stacked default, putting the caret
+   under the title and leaving a tall band of dead space beneath it.
+
+   So the layout is stated here instead of inherited. Both selectors are
+   compounded with `.setting-item` so they outrank `body.is-mobile
+   .setting-item` on specificity rather than relying on stylesheet order or
+   `!important`. Everything is scoped to the plugin's own header class: no
+   other settings row, Obsidian's or another plugin's, can match. */
+.subtle-toc-settings-group-header.setting-item,
+body.is-mobile .subtle-toc-settings-group-header.setting-item {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-4-2, 8px);
+}
+
+.subtle-toc-settings-group-header .setting-item-info,
+body.is-mobile .subtle-toc-settings-group-header .setting-item-info {
+	flex: 1 1 auto;
+	/* Let a long title ellipsis rather than force the caret onto a new line. */
+	min-width: 0;
+	margin-right: 0;
+}
+
 .subtle-toc-settings-group-header:hover {
 	background-color: var(--background-modifier-hover);
 }
@@ -756,9 +786,13 @@
 	font-weight: var(--font-medium);
 }
 
-/* The chevron is decorative here -- the whole row is the target. */
-.subtle-toc-settings-group-header .setting-item-control {
+/* The chevron is decorative here -- the whole row is the target. `width:auto`
+   neutralises the full-width control Obsidian gives a stacked mobile row. */
+.subtle-toc-settings-group-header .setting-item-control,
+body.is-mobile .subtle-toc-settings-group-header .setting-item-control {
 	flex: 0 0 auto;
+	width: auto;
+	margin: 0;
 }
 
 /* Scoped to the list element Obsidian hands us, and matching descendants
