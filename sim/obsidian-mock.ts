@@ -140,7 +140,25 @@ export class App {
 }
 
 export class Plugin {}
-export class PluginSettingTab {}
+/**
+ * Real Obsidian declares display/hide/update/refreshDomState on SettingTab,
+ * and the settings tab calls super.hide(), so the stub needs them to exist.
+ */
+export class PluginSettingTab {
+	app: unknown;
+	plugin: unknown;
+	containerEl: unknown;
+
+	constructor(app?: unknown, plugin?: unknown) {
+		this.app = app;
+		this.plugin = plugin;
+	}
+
+	display(): void {}
+	hide(): void {}
+	update(): void {}
+	refreshDomState(): void {}
+}
 export class Setting {}
 export class MarkdownView {}
 

@@ -713,21 +713,20 @@
    Settings tab — collapsible groups on the Advanced page
    ==========================================================================
 
-   Obsidian's declarative settings API has no collapse support, so the group
-   header gets a chevron (wired in settings.ts) that toggles .is-collapsed on
-   the group root. Hiding is done here rather than with a `visible` predicate
-   on each row, because a row hidden by `visible` is also dropped from
-   Obsidian's settings search -- collapsed-by-default would make every
-   advanced setting unfindable.
+   The header of each group is an ordinary `.setting-item` rendered by
+   settings.ts, not Obsidian's section-heading primitive, so it already has a
+   row's markup, divider and spacing -- the same weight as the "Advanced"
+   navigation row. Only the affordances are added here.
 
-   The header is tagged by script as the one child to keep, so this rule does
-   not depend on knowing Obsidian's internal group markup. If that tagging
-   ever fails, settings.ts leaves the group permanently expanded and
-   .is-collapsed is never applied, so content cannot become unreachable. */
+   Hiding is scoped to the group's list element (the container Obsidian hands
+   us) and matches `.setting-item` descendants rather than direct children, so
+   it does not depend on how deeply the framework nests a row. The header
+   carries its own class and is always exempt, so a collapsed group can never
+   hide the control that reopens it. If the list element is ever unavailable,
+   settings.ts leaves the group expanded and no class is applied at all. */
 
 .subtle-toc-group-header {
 	cursor: pointer;
-	border-radius: var(--radius-s);
 }
 
 .subtle-toc-group-header:hover {
@@ -737,13 +736,24 @@
 .subtle-toc-group-header:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
+	border-radius: var(--radius-s);
 }
 
-.subtle-toc-group.is-collapsed > *:not(.subtle-toc-group-header) {
+/* Match the weight of a navigation row rather than a section title. */
+.subtle-toc-group-header .setting-item-name {
+	font-weight: var(--font-medium);
+}
+
+/* The chevron is decorative here — the whole row is the target. */
+.subtle-toc-group-header .setting-item-control {
+	flex: 0 0 auto;
+}
+
+.subtle-toc-group-list.is-collapsed .setting-item:not(.subtle-toc-group-header) {
 	display: none;
 }
 
-/* The chevron should not swallow the header's own click target. */
-.subtle-toc-group-header .clickable-icon {
-	flex: 0 0 auto;
+/* Comfortable to hit on a phone, where this is the main way around settings. */
+body.is-mobile .subtle-toc-group-header {
+	min-height: 44px;
 }

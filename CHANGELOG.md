@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.7.1-beta.1
+
+Fixes the Advanced page's group headers. Settings UI only — no change to the
+outline, the overlay, the basic page, or any default.
+
+### Fixed
+
+- **Group headers rendered as section headings instead of rows.** Content,
+  Appearance, Minimap and Behavior used the group's `heading` field, which is
+  Obsidian's section-divider primitive: larger, bolder and heavily spaced. The
+  Advanced page read as four stacked titles rather than a list of rows. Each
+  header is now an ordinary `.setting-item`, the same markup Obsidian gives the
+  *Advanced* navigation entry, so it matches that weight without overriding any
+  theme styling.
+
+### Changed
+
+- Collapsing is now scoped to the list element Obsidian hands us rather than
+  guessing which ancestor is the group root. `wireCollapse()` previously walked
+  up the DOM from the chevron to find the header; a `render` definition is
+  passed both the row and the list element directly, so that walk — and its
+  failure mode — is gone.
+- The whole header row is the click target, with `role="button"`,
+  `aria-expanded` and `aria-controls`, and a 44px minimum height on mobile.
+
+### Unchanged
+
+Groups still start collapsed, still toggle independently with several open at
+once, and still reset to collapsed when the settings window closes without ever
+being written to `data.json`. All 27 setting keys keep their names, types and
+defaults.
+
+### Testing
+
+- New browser probe (`sim/settings-probe.html`) exercises the real collapse
+  code against real DOM and the real stylesheet: 15 assertions covering the
+  header being a row, collapsed-on-arrival, clicking the row, clicking the
+  chevron toggling once rather than twice, keyboard activation, independence
+  between groups, reset on close, and the no-list-element degradation.
+- A static mockup (`sim/settings-mockup.html`) shows the heading-versus-row
+  comparison side by side.
+- 63 browser assertions and 68 unit tests, all mutation-checked.
+
 ## 0.7.0-beta.1
 
 Settings UI only. No change to the outline, the overlay, the minimap or any

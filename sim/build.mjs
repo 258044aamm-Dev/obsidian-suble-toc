@@ -35,9 +35,7 @@ copyStyles();
 
 const watch = process.argv[2] === "watch";
 
-const context = await esbuild.context({
-	entryPoints: [path.join(here, "main.ts")],
-	outfile: path.join(here, "sim.js"),
+const shared = {
 	bundle: true,
 	format: "iife",
 	target: "es2018",
@@ -53,11 +51,32 @@ const context = await esbuild.context({
 			},
 		},
 	],
-});
+};
+
+/**
+ * Two bundles:
+ *   sim.js            the overlay harness (index.html)
+ *   settings-probe.js the settings-tab collapse probe (settings-probe.html)
+ *
+ * Explicit outfiles rather than one outdir, because index.html loads sim.js
+ * by name and an entry point called main.ts would otherwise emit main.js.
+ */
+const contexts = await Promise.all([
+	esbuild.context({
+		...shared,
+		entryPoints: [path.join(here, "main.ts")],
+		outfile: path.join(here, "sim.js"),
+	}),
+	esbuild.context({
+		...shared,
+		entryPoints: [path.join(here, "settings-probe.ts")],
+		outfile: path.join(here, "settings-probe.js"),
+	}),
+]);
 
 if (watch) {
-	await context.watch();
+	await Promise.all(contexts.map((c) => c.watch()));
 } else {
-	await context.rebuild();
-	await context.dispose();
+	await Promise.all(contexts.map((c) => c.rebuild()));
+	await Promise.all(contexts.map((c) => c.dispose()));
 }

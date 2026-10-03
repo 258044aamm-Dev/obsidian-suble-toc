@@ -2,8 +2,11 @@ import {
 	App,
 	ExtraButtonComponent,
 	PluginSettingTab,
+	Setting,
+	SettingDefinition,
 	SettingDefinitionGroup,
 	SettingDefinitionItem,
+	SettingGroup,
 	SettingGroupItem,
 } from "obsidian";
 import { STATUS_LABELS } from "./outline";
@@ -39,6 +42,13 @@ function debounce<T extends unknown[]>(fn: (...args: T) => void, ms: number) {
 /** Groups on the advanced page, in render order. Ids are used for collapse state. */
 const GROUPS = ["content", "appearance", "minimap", "behavior"] as const;
 type GroupId = (typeof GROUPS)[number];
+
+const GROUP_LABELS: Record<GroupId, string> = {
+	content: "Content",
+	appearance: "Appearance",
+	minimap: "Minimap",
+	behavior: "Behavior",
+};
 
 /**
  * The settings tab.
@@ -113,46 +123,59 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 	// ---- collapsing --------------------------------------------------------
 
 	/**
-	 * Wire the chevron in a group header to collapse that group.
+	 * The row that opens and closes a group.
 	 *
-	 * Obsidian's settings API has no collapse support, so this is the one place
-	 * reaching into DOM the framework owns. It is deliberately contained: if the
-	 * structure is ever not what we expect, the group is left permanently
-	 * expanded rather than throwing or rendering a header with no way to open it.
-	 *
-	 * Collapsing is CSS-only rather than a `visible` predicate on each row,
-	 * because a row hidden by `visible` is also dropped from Obsidian's settings
-	 * search for that render — collapsed-by-default would make every advanced
-	 * setting unfindable.
+	 * Rendered imperatively so that it is an ordinary `.setting-item` — the
+	 * same markup Obsidian gives the "Advanced" navigation row. The group's
+	 * declarative `heading` field was used here first, but that is the
+	 * section-heading primitive: larger, bolder and spaced as a divider, so it
+	 * read as a stack of titles rather than a list of rows.
 	 */
-	private wireCollapse(button: ExtraButtonComponent, id: GroupId): void {
-		const groupEl = button.extraSettingsEl.closest<HTMLElement>(`.subtle-toc-group--${id}`);
+	private headerRow(id: GroupId): SettingDefinition {
+		return {
+			name: GROUP_LABELS[id],
+			// An affordance rather than a setting, so keep it out of search.
+			searchable: false,
+			render: (setting, group) => this.wireHeaderRow(setting, group, id),
+		};
+	}
 
-		// The header is whichever direct child of the group contains the chevron.
-		let headerEl: HTMLElement | null = null;
-		if (groupEl) {
-			let node: HTMLElement = button.extraSettingsEl;
-			while (node.parentElement && node.parentElement !== groupEl) {
-				node = node.parentElement;
-			}
-			if (node.parentElement === groupEl) headerEl = node;
-		}
+	/**
+	 * Make a header row collapse its group.
+	 *
+	 * Both elements this needs are handed over by the API — `settingEl` is the
+	 * row and `listEl` is the container holding the group's items — so unlike
+	 * the first attempt there is no walking up the DOM guessing which ancestor
+	 * is which.
+	 */
+	private wireHeaderRow(setting: Setting, group: SettingGroup | undefined, id: GroupId): void {
+		const rowEl = setting.settingEl;
+		const listEl = group?.listEl;
 
-		if (!groupEl || !headerEl) {
-			// Degrade to always-expanded; never leave content unreachable.
+		rowEl.addClass("subtle-toc-group-header");
+
+		if (!listEl) {
+			// Nothing to scope the hide to. Leave the group open rather than
+			// risk hiding rows, or hiding the header and sealing it shut.
 			this.expanded.add(id);
-			button.setIcon("chevron-down").setTooltip("Collapse");
 			return;
 		}
 
-		headerEl.addClass("subtle-toc-group-header");
+		listEl.addClass("subtle-toc-group-list");
+		if (!listEl.id) listEl.id = `subtle-toc-group-${id}`;
+		rowEl.setAttribute("role", "button");
+		rowEl.setAttribute("aria-controls", listEl.id);
+		rowEl.tabIndex = 0;
+
+		let chevron: ExtraButtonComponent | null = null;
 
 		const apply = () => {
 			const open = this.expanded.has(id);
-			button.setIcon(open ? "chevron-down" : "chevron-right");
-			button.setTooltip(open ? "Collapse" : "Expand");
-			groupEl.toggleClass("is-collapsed", !open);
-			headerEl.setAttribute("aria-expanded", open ? "true" : "false");
+			chevron?.setIcon(open ? "chevron-down" : "chevron-right");
+			chevron?.setTooltip(open ? "Collapse" : "Expand");
+			rowEl.setAttribute("aria-expanded", open ? "true" : "false");
+			rowEl.toggleClass("is-expanded", open);
+			listEl.toggleClass("is-collapsed", !open);
 		};
 
 		const toggle = () => {
@@ -161,36 +184,34 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 			apply();
 		};
 
-		button.onClick(toggle);
+		setting.addExtraButton((b) => {
+			chevron = b;
+			b.onClick(toggle);
+		});
 
-		// Make the whole header a target, not just the 18px chevron — this is
-		// the difference between usable and not on a phone.
-		if (headerEl.dataset.subtleTocCollapse !== "1") {
-			headerEl.dataset.subtleTocCollapse = "1";
-			headerEl.setAttribute("role", "button");
-			headerEl.tabIndex = 0;
-			headerEl.addEventListener("click", (ev) => {
-				// Let the chevron's own handler run; don't double-toggle.
-				if ((ev.target as HTMLElement).closest(".clickable-icon")) return;
-				toggle();
-			});
-			headerEl.addEventListener("keydown", (ev) => {
-				if (ev.key !== "Enter" && ev.key !== " ") return;
-				ev.preventDefault();
-				toggle();
-			});
-		}
+		rowEl.addEventListener("click", (ev) => {
+			// The chevron has its own handler; letting both run toggles twice
+			// and the row looks dead.
+			const icon = chevron?.extraSettingsEl;
+			if (icon && ev.target instanceof Node && icon.contains(ev.target)) return;
+			toggle();
+		});
+
+		rowEl.addEventListener("keydown", (ev) => {
+			if (ev.key !== "Enter" && ev.key !== " ") return;
+			ev.preventDefault();
+			toggle();
+		});
 
 		apply();
 	}
 
-	private group(id: GroupId, heading: string, items: SettingGroupItem[]): SettingDefinitionGroup {
+	private group(id: GroupId, items: SettingGroupItem[]): SettingDefinitionGroup {
 		return {
 			type: "group",
-			heading,
+			// No `heading`: the first item is the header row instead.
 			cls: `subtle-toc-group subtle-toc-group--${id}`,
-			extraButtons: [(b: ExtraButtonComponent) => this.wireCollapse(b, id)],
-			items,
+			items: [this.headerRow(id), ...items],
 		};
 	}
 
@@ -278,10 +299,10 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 			name: "Advanced",
 			desc: "Content filters, text clean-up, minimap size and popover behavior.",
 			items: [
-				this.group("content", "Content", this.contentItems()),
-				this.group("appearance", "Appearance", this.appearanceItems()),
-				this.group("minimap", "Minimap", this.minimapItems()),
-				this.group("behavior", "Behavior", this.behaviorItems()),
+				this.group("content", this.contentItems()),
+				this.group("appearance", this.appearanceItems()),
+				this.group("minimap", this.minimapItems()),
+				this.group("behavior", this.behaviorItems()),
 			],
 		};
 	}

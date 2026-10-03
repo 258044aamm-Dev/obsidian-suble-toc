@@ -10,6 +10,7 @@ import { chromium } from "playwright-core";
 import fs from "fs";
 
 const URL = process.env.SIM_URL ?? "http://127.0.0.1:8080/index.html";
+const PROBE_URL = process.env.PROBE_URL ?? "http://127.0.0.1:8080/settings-probe.html";
 const SHOTS = process.argv.includes("--shots");
 const SHOT_DIR = "/home/user/shots";
 if (SHOTS) fs.mkdirSync(SHOT_DIR, { recursive: true });
@@ -390,6 +391,118 @@ console.log("\nHeader button: never");
 	await setSelect(page, "headerButton", "always");
 	const n2 = await page.$$eval("#header-actions .view-action", (e) => e.length);
 	check("exactly one button when always on (no duplicates)", n2 === 1, `n=${n2}`);
+	await page.close();
+}
+
+/* ------------------------------------------- settings: collapsible groups */
+
+{
+	console.log("\nSettings tab: collapsible groups");
+	const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
+	page.on("console", (m) => {
+		if (m.type() === "error" && !m.text().includes("favicon")) consoleErrors.push(m.text());
+	});
+	page.on("pageerror", (e) => consoleErrors.push("PAGEERROR: " + e.message));
+	await page.goto(PROBE_URL, { waitUntil: "networkidle" });
+	await page.waitForTimeout(200);
+
+	const rows = (id) => page.evaluate((g) => window.probe.rowsOf(g), id);
+
+	// The header must be an ordinary row, not Obsidian's section heading.
+	const headerIsRow = await page.$eval(
+		".subtle-toc-group--content .subtle-toc-group-header",
+		(el) => ({
+			settingItem: el.classList.contains("setting-item"),
+			heading: el.classList.contains("setting-item-heading"),
+			cursor: getComputedStyle(el).cursor,
+			role: el.getAttribute("role"),
+		}),
+	);
+	check("group header is a setting row", headerIsRow.settingItem && !headerIsRow.heading);
+	check("header looks clickable", headerIsRow.cursor === "pointer", headerIsRow.cursor);
+	check("header is exposed as a button", headerIsRow.role === "button");
+
+	const initial = await rows("content");
+	check("all four groups start collapsed", initial.filter((r) => r.visible).length === 1);
+	check("the header itself stays visible when collapsed", initial[0].isHeader && initial[0].visible);
+	check(
+		"no setting row is visible while collapsed",
+		initial.filter((r) => !r.isHeader).every((r) => !r.visible),
+	);
+
+	// Clicking the row body expands.
+	await page.click(".subtle-toc-group--content .subtle-toc-group-header .setting-item-info");
+	const opened = await rows("content");
+	check("clicking the header expands the group", opened.every((r) => r.visible), 
+		opened.filter((r) => !r.visible).map((r) => r.name).join(", "));
+	check(
+		"aria-expanded tracks the state",
+		(await page.getAttribute(".subtle-toc-group--content .subtle-toc-group-header", "aria-expanded")) === "true",
+	);
+
+	// Clicking the chevron must toggle once, not twice.
+	await page.click(".subtle-toc-group--content .subtle-toc-group-header .clickable-icon");
+	const afterChevron = await rows("content");
+	check(
+		"clicking the chevron collapses (one toggle, not two)",
+		afterChevron.filter((r) => r.visible).length === 1,
+		`${afterChevron.filter((r) => r.visible).length} visible`,
+	);
+
+	// Keyboard.
+	await page.focus(".subtle-toc-group--content .subtle-toc-group-header");
+	await page.keyboard.press("Enter");
+	check("Enter toggles the group", (await rows("content")).every((r) => r.visible));
+
+	// Groups are independent.
+	const otherStillShut = await rows("appearance");
+	check(
+		"groups toggle independently",
+		otherStillShut.filter((r) => r.visible).length === 1,
+	);
+
+	// Expanding every group leaves nothing hidden.
+	for (const id of ["appearance", "minimap", "behavior"]) {
+		await page.click(`.subtle-toc-group--${id} .subtle-toc-group-header`);
+	}
+	let allVisible = true;
+	for (const id of ["content", "appearance", "minimap", "behavior"]) {
+		if (!(await rows(id)).every((r) => r.visible)) allVisible = false;
+	}
+	check("every group can be opened at once", allVisible);
+
+	// Closing the settings window resets to collapsed.
+	await page.evaluate(() => {
+		window.probe.closeSettings();
+		window.probe.renderPage({ withListEl: true });
+	});
+	const reopened = await rows("content");
+	check(
+		"reopening settings shows the groups collapsed again",
+		reopened.filter((r) => r.visible).length === 1,
+	);
+
+	// The documented degradation: no list element means stay open, never hide.
+	await page.evaluate(() => window.probe.renderPage({ withListEl: false }));
+	const degraded = await rows("content");
+	check(
+		"degrades to fully expanded when the list element is missing",
+		degraded.every((r) => r.visible),
+		`${degraded.filter((r) => !r.visible).length} hidden`,
+	);
+	// The check above passes trivially -- with no list element no class is
+	// applied, so rows show whatever the state says. This one actually tests
+	// that degrading recorded the group as open: a later render that *does*
+	// get a list element must not snap it shut under the user.
+	await page.evaluate(() => window.probe.renderPage({ withListEl: true }));
+	const recovered = await rows("content");
+	check(
+		"a degraded group stays open once rendering recovers",
+		recovered.every((r) => r.visible),
+		`${recovered.filter((r) => !r.visible).length} hidden`,
+	);
+
+	if (SHOTS) await page.screenshot({ path: `${SHOT_DIR}/07-settings-groups.png`, fullPage: true });
 	await page.close();
 }
 

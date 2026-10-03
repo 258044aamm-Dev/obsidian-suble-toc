@@ -74,12 +74,34 @@ describe("definition tree", () => {
 		expect(pages).toHaveLength(1);
 		expect(pages[0].name).toBe("Advanced");
 		expect(pages[0].items.every((g: AnyDef) => g.type === "group")).toBe(true);
-		expect(pages[0].items.map((g: AnyDef) => g.heading)).toEqual([
+	});
+
+	it("heads each group with a row, not Obsidian's section heading", () => {
+		// `heading` renders as a section divider -- bigger, bolder, heavily
+		// spaced -- which reads as a stack of titles rather than a list of
+		// rows. The header is an ordinary rendered row instead, so it matches
+		// the weight of the "Advanced" navigation entry.
+		const { tab } = makeTab();
+		const groups = (tab.getSettingDefinitions() as AnyDef[]).find(
+			(d) => d.type === "page",
+		)!.items;
+
+		for (const group of groups) {
+			expect(group.heading).toBeUndefined();
+		}
+		expect(groups.map((g: AnyDef) => g.items[0].name)).toEqual([
 			"Content",
 			"Appearance",
 			"Minimap",
 			"Behavior",
 		]);
+		for (const group of groups) {
+			const header = group.items[0];
+			expect(header.render).toBeTypeOf("function");
+			// It is an affordance, not a setting: no control, and not indexed.
+			expect(header.control).toBeUndefined();
+			expect(header.searchable).toBe(false);
+		}
 	});
 
 	it("exposes every setting that the old UI exposed, and no key twice", () => {

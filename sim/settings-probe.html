@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Subtle TOC — settings collapse probe</title>
+		<link rel="stylesheet" href="./styles.css" />
+		<style>
+			:root {
+				--background-modifier-hover: rgba(255, 255, 255, 0.075);
+				--background-modifier-border: #333;
+				--interactive-accent: #7c6cde;
+				--text-muted: #999;
+				--font-medium: 500;
+				--radius-s: 4px;
+			}
+			body {
+				margin: 0;
+				padding: 24px;
+				background: #1e1e1e;
+				color: #dadada;
+				font-family: sans-serif;
+				font-size: 14px;
+			}
+			.setting-item {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 12px 0;
+				border-top: 1px solid var(--background-modifier-border);
+			}
+			.setting-item-info {
+				margin-right: auto;
+			}
+			.clickable-icon {
+				padding: 4px 8px;
+				color: var(--text-muted);
+				cursor: pointer;
+			}
+			.clickable-icon::after {
+				content: attr(data-icon);
+				font-size: 11px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="settings"></div>
+		<script src="./settings-probe.js"></script>
+	</body>
+</html>
