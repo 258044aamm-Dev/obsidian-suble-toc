@@ -1,7 +1,7 @@
-# Device test checklist — 0.7.5-beta.1
+# Device test checklist — 0.8.0-beta.1
 
 What I verified in the simulation harness, and what only a real device can tell
-us. Everything in §1 is already automated (`node verify.mjs`, 48 assertions);
+us. Everything in §1 is already automated (`node verify.mjs`, 518 assertions);
 §2 is what I need you to try in your vault.
 
 ## Install into your vault
@@ -49,7 +49,12 @@ Run `node verify.mjs` with the harness served (see README) to re-check:
 | Tablet | minimap kept, header button present |
 | Header button | `never` adds none, `always` adds exactly one (no duplicates) |
 
-Plus 46 unit tests (`npm test`) over the outline builder and Markdown stripping.
+| Sidebar view | panel renders the same rows as the popover (compared directly, under two setting sets), folding, active-row tracking, click-to-scroll, task completion from the panel, empty states, both surfaces on screen at once, surrounding panes untouched |
+| Plugin startup | `armed` places the panel focused but hidden, `open` reveals it, `off` places nothing, the configured side is honoured, the two commands open/toggle, the header button is not repointed |
+| Phone drawer | the panel is placed behind the swipe, tapping a row scrolls the note and collapses the drawer, the collapse setting is honoured, desktop row taps leave the dock alone |
+
+Plus 86 unit tests (`npm test`) over the outline builder, Markdown stripping,
+the settings model and the panel's placement rules.
 
 ---
 
@@ -80,6 +85,42 @@ The harness mocks Obsidian, so these are the things it genuinely cannot prove.
 - [ ] A heading containing a link, bold text and a tag reads cleanly
 - [ ] *Note header button → Always* adds one button, and switching notes
       repeatedly does **not** accumulate duplicates
+
+### The sidebar panel — new in 0.8.0-beta.1
+
+**Desktop**
+
+- [ ] *Settings → Advanced → Behavior → Sidebar outline → Open it at startup*:
+      a `Subtle TOC` tab appears in the right sidebar, and it shows the note's
+      outline
+- [ ] It sits **next to** Backlinks/Outline — those tabs still work, and
+      nothing of Obsidian's is hidden or removed
+- [ ] With the overlay also on, both are visible at once and both work
+- [ ] *Sidebar side → Left*: the tab moves to the left dock (reload or re-run
+      the command — placement happens at startup)
+- [ ] With *Sidebar outline → Off*, nothing appears on its own, and the *Open
+      in sidebar* command still places it
+- [ ] *Toggle sidebar view* puts the dock away when the panel is focused, and
+      brings it back
+- [ ] The note-header button still opens the **popover**, not the panel
+- [ ] Reorder/close the tab by hand: it comes back when reopened, with no
+      duplicate tabs
+
+**Phone**
+
+- [ ] Set *Sidebar outline → Keep it in the panel, closed*, restart Obsidian,
+      then swipe in from the right: **the swipe lands on Subtle TOC**, and the
+      drawer did not open by itself at startup
+- [ ] Tap a row: the note scrolls **and** the drawer closes, so the heading is
+      visible
+- [ ] Turn *Close the drawer after a row* off: the drawer stays open after a tap
+- [ ] The rows are comfortable to hit, same as the sheet's
+- [ ] Fold a heading in the panel; the panel does not scroll away
+- [ ] Rotate to landscape: the panel still fills the drawer
+- [ ] With the panel open, the floating overlay is still there when you close
+      the drawer (both surfaces, nothing lost)
+- [ ] Restart with *Sidebar outline → Off*: the swipe goes back to whatever
+      Obsidian normally shows, and nothing is left behind
 
 ### Phone — the main event
 

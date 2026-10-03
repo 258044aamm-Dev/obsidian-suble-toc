@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.8.0-beta.1
+
+The outline can now live in Obsidian's own side panel — the panel the swipe
+opens on a phone, the right dock on desktop — while the floating popover stays
+exactly as it was. Both can be on at once.
+
+### Added
+
+- **Sidebar view.** A standalone `SubtleTOC` view, beside Obsidian's Backlinks
+  and Outline tabs rather than replacing them. It renders through the *same*
+  renderer as the popover, so everything the popover can show, it shows:
+  headings, tasks, plain list items, callouts, folding, task checkboxes, task
+  statuses, multi-line wrapping, the heading-level range, click-to-scroll and
+  active-row tracking. What it does not carry is the popover's chrome and its
+  scroll-on-hover preview, neither of which means anything in a panel you are
+  reading from.
+- **Two commands**: *Open in sidebar* (`ensureSideLeaf` with a reveal) and
+  *Toggle sidebar view* (reveals, or puts the dock away when the panel is
+  already the focused one).
+- **Three settings**, all under *Advanced → Behavior*:
+  - **Sidebar outline** — `off` (the default: the view is registered and open
+    from its tab or the command, the plugin just never places it), `armed`
+    (the panel becomes the dock's active tab at startup *without* opening,
+    which is what makes Obsidian's own swipe land on it), or `open` (same, and
+    reveals the dock at startup).
+  - **Sidebar side** — which dock the panel lives in, right by default.
+  - **Close the drawer after a row** — phones only, on by default: tapping a
+    row scrolls the note and collapses the drawer, so the heading you just
+    jumped to is not left behind the panel.
+
+### Changed
+
+- **`TocOverlay` was split**: the outline itself — rows, tabs, folding,
+  completion, active tracking — moved into a new `OutlineTreeRenderer`
+  (`src/tree.ts`), and the inline SVG icons into `src/icons.ts`. The overlay
+  keeps the edge, minimap, task badge, popover/sheet chrome and the note-header
+  button. This is a move, not a rewrite: the overlay's DOM, class names and
+  behaviour are unchanged, verified by the pre-existing suite running green
+  without a single assertion edited.
+
+### Notes
+
+- The note-header button is **unchanged** — it still toggles the popover.
+  Repointing an existing affordance at something new is a surprise, not a
+  feature; the panel has its own tab and its own commands.
+- The sidebar tracks the last note view it saw, because with the panel focused
+  `getActiveViewOfType(MarkdownView)` answers `null` — the naive version of this
+  is empty exactly when you tap into it.
+- Nothing changes for anyone who does not opt in: `sidebarMode` ships `off`,
+  and the view is inert until it is placed.
+
+### Testing
+
+- 86 unit tests (74 before) and 518 browser assertions (479 before), build
+  clean.
+- The harness grew a plugin-level page that boots the *real* plugin against the
+  mock workspace (registration, layout-ready placement, the commands, the
+  note-header button), so the placement assertions test the real startup path
+  rather than a helper called by hand.
+- Sensitivity, as usual: forcing `reveal: true` fails the two `armed`
+  assertions; dropping the phone guard on the drawer collapse fails the desktop
+  "leaves the dock alone" assertion; breaking the shared renderer's active-row
+  marker fails the popover assertion *and* the panel assertion.
+
 ## 0.7.5-beta.1
 
 Removes dead code and stale references. No behaviour change, no settings UI

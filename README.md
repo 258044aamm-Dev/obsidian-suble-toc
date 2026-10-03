@@ -13,6 +13,10 @@ list items and callout headers, each sitting under the heading it belongs to.
 ## Features
 
 - **Floating popover** overlaid on the note (no sidebar pane needed).
+- **Sidebar view** *(optional)* — the same outline in Obsidian's own side panel:
+  the right dock on desktop, the drawer the swipe opens on a phone. It sits
+  beside Backlinks/Outline rather than replacing them, and it can be on at the
+  same time as the floating popover.
 - **Unified outline tree** — headings, tasks, lists and callouts in one nested
   view, with sub-tasks under their parent task. The original two-tab split is
   still available via *Outline mode → Separate tabs*.
@@ -49,6 +53,28 @@ list items and callout headers, each sitting under the heading it belongs to.
   once.
 - Configurable side (left/right), open trigger (hover/click) and heading-level
   range. The heading-level range doesn't apply to tasks.
+
+## The sidebar view
+
+The panel Obsidian opens when you swipe in from the right can show Subtle TOC
+instead of — or as well as — the floating outline. It is a view of its own
+(`Subtle TOC` in the dock), so nothing of Obsidian's is disabled or replaced.
+
+- **Desktop**: the panel is a tab in the right dock, next to Backlinks and
+  Outline. Open it from that tab, or with the *Open in sidebar* command.
+- **Phone**: set *Sidebar outline* to **Armed** and the panel becomes the
+  drawer's active tab at startup without opening — so Obsidian's own swipe
+  lands on it — and tapping a row scrolls the note and collapses the drawer
+  again.
+- **Commands**: *Subtle TOC: Open in sidebar*, *Subtle TOC: Toggle sidebar
+  view*.
+- **Both at once**: the popover and the panel are independent. If the panel is
+  what you want, turn the minimap off; if you want both, keep them both.
+
+It shows everything the popover shows, because it renders through the same
+renderer: headings, tasks, lists, callouts, folding, task checkboxes, statuses,
+wrapping and active-row tracking. Deliberately not included: the edge minimap,
+the phone sheet, and the popover's scroll-on-hover preview.
 
 ## Settings
 
@@ -112,6 +138,9 @@ and a caret on the right-hand side that folds its settings away.
 | Close delay | 160 ms | Grace period before the popover closes once the mouse leaves it. |
 | Smooth scroll | On | Animate the scroll when navigating. |
 | Scroll to heading on hover | Off | Temporarily scroll to a hovered heading and return on leave; click to navigate normally and stay there. |
+| Sidebar outline | Off | Where the side-panel outline is placed: never (`Off`), made the dock's active tab without opening (`Keep it in the panel, closed` — this is the mode that puts it behind Obsidian's swipe), or placed and revealed at startup (`Open it at startup`). |
+| Sidebar side | Right | Which dock the side-panel outline lives in. |
+| Close the drawer after a row | On | Phones only: collapse the panel after tapping a row, so the heading that was just scrolled to is visible. |
 
 ## Develop and verify
 
@@ -199,6 +228,11 @@ hotkey) to open/close the outline from the keyboard.
   undoable) and writes the file directly in Reading mode.
 - One overlay instance is bound to the active Markdown view at a time and rebuilt
   when you switch notes, panes or modes.
+- The sidebar view hosts the same `OutlineTreeRenderer` the popover does
+  (`src/tree.ts`), which is why the two cannot drift apart. It reads the last
+  note view the plugin saw, because once the panel has focus
+  `getActiveViewOfType(MarkdownView)` returns `null` — asking the workspace for
+  "the active note" there gives you an empty panel exactly when you tap it.
 
 ## License
 
