@@ -1,4 +1,4 @@
-# Device test checklist — 0.7.4-beta.1
+# Device test checklist — 0.7.5-beta.1
 
 What I verified in the simulation harness, and what only a real device can tell
 us. Everything in §1 is already automated (`node verify.mjs`, 48 assertions);
@@ -157,7 +157,7 @@ console.log(JSON.stringify({
 Console: `Ctrl/Cmd+Shift+I` on desktop, `chrome://inspect` on Android, and
 Safari's *Develop* menu on iOS.
 
-### Known limitations (not fixed in this round — Phase 4/5 of `PLAN.md`)
+### Known limitations (not fixed in this round)
 
 - No keyboard navigation yet; rows are still not Tab-reachable
 - Still one overlay for the focused pane only: split panes show it on the

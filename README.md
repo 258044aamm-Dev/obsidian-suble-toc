@@ -156,8 +156,10 @@ install it with [BRAT](https://github.com/TfTHacker/obsidian42-brat):
 2. Open the command palette and run **BRAT: Add a beta plugin for testing**.
 3. Paste the repository URL:
    ```
-   https://github.com/xupisco/obisidian-suble-toc
+   https://github.com/xupisco/obsidian-suble-toc
    ```
+   *(Testing a fork? Paste that fork's URL instead — `BRAT` looks only at the
+   repository you give it, and installs whatever its latest release contains.)*
 4. Confirm — BRAT downloads the latest release and keeps it up to date.
 5. Enable **Subtle TOC** in *Settings → Community plugins*.
 

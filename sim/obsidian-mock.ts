@@ -8,7 +8,7 @@
 
 /* ---- DOM helpers Obsidian adds to HTMLElement ---------------------------- */
 
-export interface DomElementInfo {
+interface DomElementInfo {
 	cls?: string | string[];
 	text?: string;
 	attr?: Record<string, string>;
@@ -95,11 +95,11 @@ export function setPlatform(profile: "desktop" | "tablet" | "phone"): void {
 
 /* ---- metadata shapes ----------------------------------------------------- */
 
-export interface Pos {
+interface Pos {
 	start: { line: number; col?: number; offset?: number };
 	end: { line: number; col?: number; offset?: number };
 }
-export interface HeadingCache {
+interface HeadingCache {
 	heading: string;
 	level: number;
 	position: Pos;
@@ -109,7 +109,7 @@ export interface ListItemCache {
 	parent: number;
 	position: Pos;
 }
-export interface SectionCache {
+interface SectionCache {
 	type: string;
 	position: Pos;
 }
@@ -161,5 +161,3 @@ export class PluginSettingTab {
 }
 export class Setting {}
 export class MarkdownView {}
-
-export type IconName = string;

@@ -8,12 +8,12 @@
  * rather than stubbed out.
  */
 
-export interface LineInfo {
+interface LineInfo {
 	from: number;
 	number: number;
 }
 
-export interface BlockInfo {
+interface BlockInfo {
 	top: number;
 	height: number;
 }

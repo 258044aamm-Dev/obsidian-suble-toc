@@ -270,7 +270,7 @@ export function completeTask(app: App, view: MarkdownView, line: number): boolea
 }
 
 /** Anything with a document line; headings and outline nodes both qualify. */
-export interface LineItem {
+interface LineItem {
 	line: number;
 }
 

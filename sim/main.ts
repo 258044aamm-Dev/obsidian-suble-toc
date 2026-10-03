@@ -111,7 +111,7 @@ const view = {
 	currentMode: {},
 	getMode: () => "source",
 	getViewData: () => PADDED,
-	addAction(icon: string, title: string, callback: () => void) {
+	addAction(_icon: string, title: string, callback: () => void) {
 		const btn = document.createElement("div");
 		btn.className = "view-action";
 		btn.title = title;

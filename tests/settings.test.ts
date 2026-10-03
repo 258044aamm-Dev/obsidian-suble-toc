@@ -192,9 +192,7 @@ describe("definition tree", () => {
 		for (const status of STATUS_ORDER) expect(covered.has(`status:${status}`)).toBe(true);
 		covered.add("taskStatuses");
 
-		// listMaxDepth was never exposed by the old UI either; it stays a known
-		// gap rather than becoming a silent regression of this change.
-		const expected = Object.keys(DEFAULT_SETTINGS).filter((k) => k !== "listMaxDepth");
+		const expected = Object.keys(DEFAULT_SETTINGS);
 		const missing = expected.filter((k) => !covered.has(k));
 		expect(missing).toEqual([]);
 	});
@@ -452,7 +450,7 @@ describe("collapse state", () => {
 });
 
 describe("defaults are untouched by this change", () => {
-	it("still ships the same 27 keys with the same values", () => {
+	it("still ships the same 26 keys with the same values", () => {
 		expect(DEFAULT_SETTINGS).toEqual({
 			show: "both",
 			defaultTab: "headings",
@@ -473,7 +471,6 @@ describe("defaults are untouched by this change", () => {
 			multiLine: true,
 			outlineMode: "unified",
 			listItems: "none",
-			listMaxDepth: 2,
 			taskStatuses: ["todo"],
 			showCallouts: false,
 			stripMarkdown: true,

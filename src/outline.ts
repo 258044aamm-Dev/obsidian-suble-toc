@@ -334,7 +334,3 @@ export function countOf(nodes: OutlineNode[], match: (n: OutlineNode) => boolean
 	return n;
 }
 
-/** True when the node can be folded (it has at least one rendered descendant). */
-export function isFoldable(node: OutlineNode): boolean {
-	return node.children.length > 0;
-}

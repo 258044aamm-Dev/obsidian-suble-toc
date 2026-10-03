@@ -1,19 +1,3 @@
-export interface HeadingItem {
-	/** Heading level, 1-6. */
-	level: number;
-	/** Plain-text content of the heading. */
-	text: string;
-	/** 0-based line number in the document. */
-	line: number;
-}
-
-export interface TaskItem {
-	/** Displayed text of the task (list/checkbox markup stripped). */
-	text: string;
-	/** 0-based line number in the document. */
-	line: number;
-}
-
 /** A navigable target: enough for scrollToTarget to scroll/flash it. */
 export type NavTarget = { text: string; line: number };
 
@@ -111,8 +95,6 @@ export interface SubtleTocSettings {
 	outlineMode: TocOutlineMode;
 	/** Which plain bullets and numbered items to include. */
 	listItems: TocListItems;
-	/** Deepest list nesting level to render (counted from the list root). */
-	listMaxDepth: number;
 	/** Task statuses to surface. */
 	taskStatuses: TaskStatusKey[];
 	/** Include callout headers (`> [!note] Title`) as outline rows. */
@@ -155,7 +137,6 @@ export const DEFAULT_SETTINGS: SubtleTocSettings = {
 	// Off by default: a meeting-notes page can carry 150+ bullets, and the
 	// outline should stay an outline until the user asks for more.
 	listItems: "none",
-	listMaxDepth: 2,
 	taskStatuses: ["todo"],
 	showCallouts: false,
 	stripMarkdown: true,

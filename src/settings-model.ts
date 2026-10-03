@@ -37,7 +37,7 @@ export const STATUS_ORDER: TaskStatusKey[] = [
 ];
 
 /** Keys that map one-to-one onto a field of SubtleTocSettings. */
-export type DirectControlKey =
+type DirectControlKey =
 	| "show"
 	| "outlineMode"
 	| "listItems"
@@ -65,7 +65,7 @@ export type DirectControlKey =
 	| "hideMinimapOnPhone";
 
 /** `taskStatuses` is one array rendered as eight independent toggles. */
-export type StatusControlKey = `status:${TaskStatusKey}`;
+type StatusControlKey = `status:${TaskStatusKey}`;
 
 export type SettingsControlKey = DirectControlKey | StatusControlKey;
 
@@ -117,7 +117,7 @@ export const SLIDER_KEYS: ReadonlySet<SettingsControlKey> = new Set<SettingsCont
 	"closeDelay",
 ]);
 
-export function isStatusKey(key: SettingsControlKey): key is StatusControlKey {
+function isStatusKey(key: SettingsControlKey): key is StatusControlKey {
 	return key.startsWith("status:");
 }
 

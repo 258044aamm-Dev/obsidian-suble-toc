@@ -162,11 +162,6 @@ body {
 	height: 720px;
 }
 
-.frame.is-tablet {
-	width: 600px;
-	height: 760px;
-}
-
 .frame.is-phone {
 	width: 390px;
 	height: 760px;

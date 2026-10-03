@@ -59,7 +59,7 @@ const TASK_EMOJI_BARE =
 	/[\u{23EB}\u{23E9}\u{23EC}\u{1F53C}\u{1F53D}\u{1F501}\u{1F6AB}\u{2049}\u{1F3C1}]\uFE0F?/gu;
 /** Dataview-style `[priority:: high]` is already covered by DATAVIEW_BRACKET. */
 
-export interface StripOptions {
+interface StripOptions {
 	/** Remove `#tags` from the displayed text. */
 	stripTags?: boolean;
 	/** Remove Tasks-plugin emoji metadata and Dataview inline fields. */
