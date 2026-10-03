@@ -1,4 +1,4 @@
-import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, Platform, TFile, WorkspaceLeaf } from "obsidian";
 import { OutlineTreeRenderer, TreeCallbacks } from "./tree";
 import { VIEW_TYPE_SUBTLE_TOC } from "./sidebar-mode";
 import type SubtleTocPlugin from "./main";
@@ -47,6 +47,7 @@ export class SubtleTocSidebarView extends ItemView {
 			// A panel is always on screen, so the active row is kept in view and
 			// the tab is corrected on refresh whenever the note cannot fill it.
 			canAutoScrollActive: () => true,
+			onNavigated: () => this.closeDrawerAfterTap(),
 		};
 		this.renderer = new OutlineTreeRenderer({
 			plugin: this.plugin,
@@ -79,6 +80,21 @@ export class SubtleTocSidebarView extends ItemView {
 	/** Rebuild from the note. Called by the plugin when settings change. */
 	refresh(): void {
 		this.renderer?.refresh();
+	}
+
+	/**
+	 * Phones only: get the drawer out of the way, so the heading that was just
+	 * scrolled to is visible rather than sitting behind the panel. On desktop
+	 * the dock is a place the user chose to have open, and it stays.
+	 */
+	private closeDrawerAfterTap(): void {
+		if (!Platform.isMobile) return;
+		if (!this.plugin.settings.sidebarCollapseOnTap) return;
+		const split =
+			this.plugin.settings.sidebarSide === "left"
+				? this.app.workspace.leftSplit
+				: this.app.workspace.rightSplit;
+		split.collapse();
 	}
 
 	/** The file the panel is describing, for change filtering. */

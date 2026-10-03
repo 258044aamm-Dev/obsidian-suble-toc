@@ -48,6 +48,26 @@ function sidebarIsVisible(plugin: SubtleTocPlugin): boolean {
 	return sidebarLeaves(plugin.app).some((leaf) => leaf === activeLeaf);
 }
 
+/**
+ * Place the view at startup, according to `sidebarMode`.
+ *
+ * `armed` makes it the dock's *active tab* without revealing the dock: on a
+ * phone that is what puts the panel behind Obsidian's own swipe, since the
+ * gesture opens whatever the drawer last showed — and it never pops the drawer
+ * open by itself. `open` does the same and reveals it.
+ *
+ * Idempotent: `ensureSideLeaf` reuses the existing leaf, so calling this again
+ * (a settings change, a re-arm) cannot produce a second panel.
+ */
+export async function armSidebar(plugin: SubtleTocPlugin): Promise<void> {
+	const mode = plugin.settings.sidebarMode;
+	if (mode === "off") return;
+	await plugin.app.workspace.ensureSideLeaf(VIEW_TYPE_SUBTLE_TOC, plugin.settings.sidebarSide, {
+		active: true,
+		reveal: mode === "open",
+	});
+}
+
 /** Open (or reveal) the view in its dock and focus it. */
 export async function openSidebar(plugin: SubtleTocPlugin): Promise<void> {
 	await plugin.app.workspace.ensureSideLeaf(VIEW_TYPE_SUBTLE_TOC, plugin.settings.sidebarSide, {

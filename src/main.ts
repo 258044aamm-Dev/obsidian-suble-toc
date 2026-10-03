@@ -2,7 +2,7 @@ import { MarkdownView, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, SubtleTocSettings } from "./types";
 import { TocOverlay } from "./overlay";
 import { SubtleTocSidebarView } from "./sidebar";
-import { VIEW_TYPE_SUBTLE_TOC, openSidebar, toggleSidebar } from "./sidebar-mode";
+import { VIEW_TYPE_SUBTLE_TOC, armSidebar, openSidebar, toggleSidebar } from "./sidebar-mode";
 import { SubtleTocSettingTab } from "./settings";
 
 export default class SubtleTocPlugin extends Plugin {
@@ -66,7 +66,14 @@ export default class SubtleTocPlugin extends Plugin {
 			callback: () => void toggleSidebar(this),
 		});
 
-		this.app.workspace.onLayoutReady(() => this.sync());
+		this.app.workspace.onLayoutReady(() => {
+			this.sync();
+			// Placement only, and only if the user asked for it. A failure here
+			// must not take the rest of the plugin's startup down with it.
+			void armSidebar(this).catch((e) =>
+				console.warn("Subtle TOC: could not place the sidebar view", e),
+			);
+		});
 	}
 
 	onunload(): void {

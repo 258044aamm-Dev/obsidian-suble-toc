@@ -11,6 +11,7 @@ import fs from "fs";
 
 const URL = process.env.SIM_URL ?? "http://127.0.0.1:8080/index.html";
 const PROBE_URL = process.env.PROBE_URL ?? "http://127.0.0.1:8080/settings-probe.html";
+const PLUGIN_URL = process.env.PLUGIN_URL ?? "http://127.0.0.1:8080/plugin.html";
 const SHOTS = process.argv.includes("--shots");
 const SHOT_DIR = "/home/user/shots";
 if (SHOTS) fs.mkdirSync(SHOT_DIR, { recursive: true });
@@ -34,6 +35,46 @@ const browser = await chromium.launch({
 });
 
 const consoleErrors = [];
+
+/**
+ * A page running the *real plugin* against the mock workspace: registration,
+ * the startup placement, and the two commands. Device profile and stored
+ * settings are set before the reload the driver triggers, because placement
+ * happens once, at layout-ready.
+ */
+async function newPluginPage({ device = "desktop", mode = "armed", side = "right" } = {}) {
+	const page = await browser.newPage({ viewport: { width: 1340, height: 920 } });
+	page.on("console", (m) => {
+		if (m.type() === "error" && !m.text().includes("favicon")) consoleErrors.push(m.text());
+	});
+	page.on("pageerror", (e) => consoleErrors.push("PAGEERROR: " + e.message));
+	await page.goto(PLUGIN_URL, { waitUntil: "networkidle" });
+	// The settings have to be in place *before* the plugin loads: placement runs
+	// once, at layout-ready. So store them, then boot again.
+	await page.evaluate(
+		({ mode, side }) => {
+			localStorage.setItem(
+				"subtle-toc-sim-settings",
+				JSON.stringify({ sidebarMode: mode, sidebarSide: side, sidebarCollapseOnTap: true }),
+			);
+		},
+		{ mode, side },
+	);
+	await page.reload({ waitUntil: "networkidle" });
+	await page.waitForFunction(() => window.pluginSim?.ready === true, null, { timeout: 5000 });
+	await page.evaluate((device) => window.pluginSim.setPlatform(device), device);
+	await page.evaluate(
+		({ mode, side }) => {
+			(document.getElementById("sidebarMode")).value = mode;
+			(document.getElementById("sidebarSide")).value = side;
+		},
+		{ mode, side },
+	);
+	return page;
+}
+
+const placementOf = (page) =>
+	page.evaluate(() => window.pluginSim.app.workspace.sideLeafCalls.map((c) => [c.side, c.options]));
 
 async function newPage(opts = {}) {
 	const page = await browser.newPage({
@@ -892,6 +933,186 @@ console.log("\nHeader button: never");
 		"the plugin leaves the surrounding panes alone",
 		untouched.note && untouched.dock && untouched.dockVisible && untouched.hidden === 0,
 		JSON.stringify(untouched),
+	);
+
+	await page.close();
+}
+
+/* ------------------------------------------------------- plugin: placement */
+
+/**
+ * Which dock the panel is put in, and whether it is revealed, is the whole of
+ * `sidebarMode` — and it happens once, at layout-ready, from the settings on
+ * disk. So each case boots a fresh page with those settings stored.
+ */
+{
+	const armed = await newPluginPage({ mode: "armed" });
+	const calls = await placementOf(armed);
+	check(
+		"armed: the panel is placed once, focused, without revealing the dock",
+		calls.length === 1 &&
+			calls[0][0] === "right" &&
+			calls[0][1].active === true &&
+			calls[0][1].reveal === false,
+		JSON.stringify(calls),
+	);
+	check(
+		"armed: the drawer is left closed — swiping in is what opens it",
+		await armed.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed),
+	);
+	check(
+		"armed: the panel behind the swipe has the note in it",
+		(await armed.$$eval(".subtle-toc-sidebar .subtle-toc-item", (e) => e.length)) > 0,
+	);
+	check(
+		"armed: the note keeps its own floating outline",
+		(await armed.$$eval("#note-content .subtle-toc-root", (e) => e.length)) === 1,
+	);
+	await armed.close();
+
+	const open = await newPluginPage({ mode: "open" });
+	const openCalls = await placementOf(open);
+	check(
+		"open: the dock is revealed at startup",
+		openCalls.length === 1 && openCalls[0][1].reveal === true,
+		JSON.stringify(openCalls),
+	);
+	check(
+		"open: and it really is open",
+		!(await open.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed)),
+	);
+	await open.close();
+
+	const off = await newPluginPage({ mode: "off" });
+	const offCalls = await placementOf(off);
+	check("off: nothing is placed, nothing is revealed", offCalls.length === 0, JSON.stringify(offCalls));
+	check(
+		"off: the note still has its overlay, as before this feature existed",
+		(await off.$$eval("#note-content .subtle-toc-root", (e) => e.length)) === 1,
+	);
+	await off.close();
+
+	const left = await newPluginPage({ mode: "armed", side: "left" });
+	const leftCalls = await placementOf(left);
+	check(
+		"armed on the left: the left dock gets it and the right dock does not",
+		leftCalls.length === 1 &&
+			leftCalls[0][0] === "left" &&
+			(await left.$$eval("#dock-body-left .subtle-toc-sidebar", (e) => e.length)) === 1 &&
+			(await left.$$eval("#dock-body-right .subtle-toc-sidebar", (e) => e.length)) === 0,
+		JSON.stringify(leftCalls),
+	);
+	await left.close();
+}
+
+/* --------------------------------------------------------- plugin: commands */
+
+{
+	const page = await newPluginPage({ mode: "off" });
+	check(
+		"with nothing placed, the dock starts collapsed",
+		await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed),
+	);
+
+	await page.click("#open");
+	await page.waitForTimeout(250);
+	check(
+		"\"Open in sidebar\" places the view and reveals the dock",
+		!(await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed)) &&
+			(await page.$$eval("#dock-body-right .subtle-toc-sidebar", (e) => e.length)) === 1,
+	);
+	check(
+		"and it focuses the panel, so the note no longer answers as the active view",
+		await page.evaluate(
+			() => window.pluginSim.app.workspace.activeLeaf?.view?.getViewType() === "subtle-toc-sidebar",
+		),
+	);
+	check(
+		"the note in the panel survives the panel taking focus",
+		(await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (e) => e.length)) > 0,
+	);
+
+	// Toggling while the panel is focused puts the dock away.
+	await page.click("#toggle");
+	await page.waitForTimeout(200);
+	check(
+		"\"Toggle sidebar view\" puts the dock away when the panel is up",
+		await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed),
+	);
+
+	await page.click("#toggle");
+	await page.waitForTimeout(200);
+	check(
+		"and brings it back",
+		!(await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed)),
+	);
+
+	// The note-header button is unchanged: it still belongs to the popover.
+	check(
+		"the header button was not repointed at the panel",
+		(await page.$$eval("#header-actions .view-action", (e) => e.length)) === 0,
+	);
+
+	await page.close();
+}
+
+/* ---------------------------------------------- plugin: drawer on a phone -- */
+
+{
+	// Tablet and phone: the split is the drawer, and tapping a row in the panel
+	// has to get it out of the way so the heading is visible.
+	const page = await newPluginPage({ mode: "open", device: "phone" });
+	check(
+		"phone: the panel is placed and the drawer is open",
+		!(await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed)) &&
+			(await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (e) => e.length)) > 0,
+	);
+
+	const scrollBefore = await page.$eval("#note-scroll", (e) => e.scrollTop);
+	await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (els) => {
+		const row = els.find((e) => e.textContent.trim() === "Risks");
+		row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	});
+	await page.waitForTimeout(700);
+	check(
+		"phone: tapping a row scrolls the note",
+		(await page.$eval("#note-scroll", (e) => e.scrollTop)) > scrollBefore,
+	);
+	check(
+		"phone: and the drawer gets out of the way",
+		await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed),
+	);
+
+	// With the setting off, the drawer stays where the user put it.
+	await page.evaluate(() => {
+		window.pluginSim.settings().sidebarCollapseOnTap = false;
+		window.pluginSim.app.workspace.rightSplit.expand();
+	});
+	await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (els) => {
+		const row = els.find((e) => e.textContent.trim() === "Planning");
+		row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	});
+	await page.waitForTimeout(500);
+	check(
+		"phone: the collapse-on-tap setting is honoured",
+		!(await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed)),
+	);
+
+	// Desktop keeps the dock: it is a panel the user chose to have open. The
+	// setting is switched back on first, so this asks about the platform guard
+	// rather than about a collapse that the setting already disabled.
+	await page.evaluate(() => {
+		window.pluginSim.settings().sidebarCollapseOnTap = true;
+		window.pluginSim.setPlatform("desktop");
+	});
+	await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (els) => {
+		const row = els.find((e) => e.textContent.trim() === "Execution");
+		row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	});
+	await page.waitForTimeout(500);
+	check(
+		"desktop: a row tap leaves the dock alone",
+		!(await page.evaluate(() => window.pluginSim.app.workspace.rightSplit.collapsed)),
 	);
 
 	await page.close();

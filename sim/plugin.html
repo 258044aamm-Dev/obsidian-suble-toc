@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" class="theme-dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Subtle TOC — plugin harness</title>
+		<link rel="stylesheet" href="./sim.css" />
+		<link rel="stylesheet" href="./styles.css" />
+	</head>
+	<body>
+		<header class="bar">
+			<strong>Subtle TOC</strong>
+			<span class="muted">
+				plugin harness — the real plugin, its real commands, a mock workspace
+			</span>
+		</header>
+
+		<div class="layout">
+			<aside class="panel">
+				<h2>Startup</h2>
+				<label
+					>Sidebar mode
+					<select id="sidebarMode">
+						<option value="off">Off</option>
+						<option value="armed" selected>Armed</option>
+						<option value="open">Open at startup</option>
+					</select>
+				</label>
+				<label
+					>Sidebar side
+					<select id="sidebarSide">
+						<option value="right" selected>Right</option>
+						<option value="left">Left</option>
+					</select>
+				</label>
+				<label
+					>Profile
+					<select id="device">
+						<option value="desktop" selected>Desktop</option>
+						<option value="tablet">Tablet</option>
+						<option value="phone">Phone</option>
+					</select>
+				</label>
+				<label class="check"
+					><input type="checkbox" id="sidebarCollapseOnTap" checked /> Collapse the drawer on tap</label
+				>
+
+				<h2>Commands</h2>
+				<div class="row">
+					<button id="open">Open in sidebar</button>
+					<button id="toggle">Toggle sidebar view</button>
+				</div>
+
+				<h2>State</h2>
+				<pre id="readout" class="readout"></pre>
+				<p class="hint">
+					Reload the page after changing a startup setting: placement happens once, at
+					layout-ready, exactly as it does in Obsidian.
+				</p>
+			</aside>
+
+			<main class="stage">
+				<div class="frame is-desktop" id="frame">
+					<div class="view-header">
+						<div class="view-header-title">Quarterly review</div>
+						<div class="view-actions" id="header-actions"></div>
+					</div>
+					<div class="markdown-source-view mod-cm6" id="note-content">
+						<div class="cm-scroller" id="note-scroll">
+							<div class="cm-content" id="note-lines"></div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Obsidian's side dock/drawer: one element per side, collapsed
+				     until something reveals it. -->
+				<aside class="dock is-collapsed" id="dock-right">
+					<div class="dock-title">Right sidebar</div>
+					<div class="dock-body" id="dock-body-right"></div>
+				</aside>
+				<aside class="dock is-collapsed" id="dock-left">
+					<div class="dock-title">Left sidebar</div>
+					<div class="dock-body" id="dock-body-left"></div>
+				</aside>
+			</main>
+		</div>
+
+		<script src="./plugin.js"></script>
+	</body>
+</html>

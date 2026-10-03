@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { VIEW_TYPE_SUBTLE_TOC, openSidebar, toggleSidebar } from "../src/sidebar-mode";
+import {
+	VIEW_TYPE_SUBTLE_TOC,
+	armSidebar,
+	openSidebar,
+	toggleSidebar,
+} from "../src/sidebar-mode";
 import type SubtleTocPlugin from "../src/main";
 
 /**
@@ -15,8 +20,15 @@ import type SubtleTocPlugin from "../src/main";
 
 type Call = [type: string, side: string, options: Record<string, unknown>];
 
-function makePlugin(options: { side?: "left" | "right"; collapsed?: boolean; withLeaf?: boolean } = {}) {
-	const { side = "right", collapsed = true, withLeaf = false } = options;
+function makePlugin(
+	options: {
+		side?: "left" | "right";
+		collapsed?: boolean;
+		withLeaf?: boolean;
+		mode?: "off" | "armed" | "open";
+	} = {},
+) {
+	const { side = "right", collapsed = true, withLeaf = false, mode = "off" } = options;
 	const calls: Call[] = [];
 	const leaf = { id: `${side}:${VIEW_TYPE_SUBTLE_TOC}`, view: {} };
 
@@ -49,7 +61,7 @@ function makePlugin(options: { side?: "left" | "right"; collapsed?: boolean; wit
 		},
 	};
 
-	const plugin = { app, settings: { sidebarSide: side } };
+		const plugin = { app, settings: { sidebarSide: side, sidebarMode: mode } };
 	return {
 		plugin: plugin as unknown as SubtleTocPlugin,
 		app,
@@ -74,6 +86,41 @@ describe("opening the panel", () => {
 
 		expect(calls[0][1]).toBe("left");
 		expect(otherDock.collapsed).toBe(true);
+	});
+});
+
+describe("arming the panel at startup", () => {
+	it("does nothing at all when the mode is off", async () => {
+		const { plugin, calls, dock } = makePlugin({ mode: "off" });
+		await armSidebar(plugin);
+
+		expect(calls).toEqual([]);
+		expect(dock.collapsed).toBe(true);
+	});
+
+	it("makes the panel the dock's active tab without revealing it", async () => {
+		// This is what puts the panel behind Obsidian's own swipe: the gesture
+		// opens whatever the drawer last showed. Revealing it here would pop the
+		// drawer open at startup, uninvited.
+		const { plugin, calls, dock } = makePlugin({ mode: "armed" });
+		await armSidebar(plugin);
+
+		expect(calls).toEqual([[VIEW_TYPE_SUBTLE_TOC, "right", { active: true, reveal: false }]]);
+		expect(dock.collapsed).toBe(true);
+	});
+
+	it("reveals the dock too when the mode says open", async () => {
+		const { plugin, calls } = makePlugin({ mode: "open" });
+		await armSidebar(plugin);
+
+		expect(calls[0][2]).toMatchObject({ active: true, reveal: true });
+	});
+
+	it("arms into the configured side", async () => {
+		const { plugin, calls } = makePlugin({ mode: "armed", side: "left" });
+		await armSidebar(plugin);
+
+		expect(calls[0][1]).toBe("left");
 	});
 });
 

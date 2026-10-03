@@ -54,9 +54,10 @@ const shared = {
 };
 
 /**
- * Two bundles:
+ * Three bundles:
  *   sim.js            the overlay harness (index.html)
  *   settings-probe.js the settings-tab collapse probe (settings-probe.html)
+ *   plugin.js         the plugin harness (plugin.html) 
  *
  * Explicit outfiles rather than one outdir, because index.html loads sim.js
  * by name and an entry point called main.ts would otherwise emit main.js.
@@ -71,6 +72,11 @@ const contexts = await Promise.all([
 		...shared,
 		entryPoints: [path.join(here, "settings-probe.ts")],
 		outfile: path.join(here, "settings-probe.js"),
+	}),
+	esbuild.context({
+		...shared,
+		entryPoints: [path.join(here, "plugin.ts")],
+		outfile: path.join(here, "plugin.js"),
 	}),
 ]);
 
