@@ -36,7 +36,3 @@ export class PluginSettingTab {
 		/* no-op */
 	}
 }
-
-export class Setting {}
-export class ExtraButtonComponent {}
-export class App {}
