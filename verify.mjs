@@ -51,7 +51,7 @@ async function newPage(opts = {}) {
 }
 
 const rowsOf = (page) =>
-	page.$$eval(".subtle-toc-item", (els) =>
+	page.$$eval(".subtle-toc-root .subtle-toc-item", (els) =>
 		els.map((e) => ({
 			kind: (e.className.match(/subtle-toc-kind-(\w+)/) || [])[1] || "?",
 			// The row also contains a status glyph, so read the text span only.
@@ -60,6 +60,17 @@ const rowsOf = (page) =>
 			pad: parseFloat(getComputedStyle(e).paddingLeft),
 			cls: e.className,
 			h: Math.round(e.getBoundingClientRect().height),
+		})),
+	);
+
+/** Rows of the sidebar panel, in the same shape rowsOf() gives for the popover. */
+const panelRowsOf = (page) =>
+	page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (els) =>
+		els.map((e) => ({
+			kind: (e.className.match(/subtle-toc-kind-(\w+)/) || [])[1] || "?",
+			text: (e.querySelector(".subtle-toc-item-text")?.textContent || "").trim(),
+			cls: e.className,
+			pad: parseFloat(getComputedStyle(e).paddingLeft),
 		})),
 	);
 
@@ -144,11 +155,11 @@ console.log("\nDesktop — default settings");
 
 	// Folding
 	const before = (await rowsOf(page)).length;
-	await page.click(".subtle-toc-item.subtle-toc-kind-heading.is-foldable .subtle-toc-twisty");
+	await page.click(".subtle-toc-root .subtle-toc-item.subtle-toc-kind-heading.is-foldable .subtle-toc-twisty");
 	await page.waitForTimeout(250);
 	const after = (await rowsOf(page)).length;
 	check("folding hides descendants", after < before, `${before} -> ${after}`);
-	await page.click(".subtle-toc-item.subtle-toc-kind-heading.is-collapsed .subtle-toc-twisty");
+	await page.click(".subtle-toc-root .subtle-toc-item.subtle-toc-kind-heading.is-collapsed .subtle-toc-twisty");
 	await page.waitForTimeout(250);
 	check("unfolding restores them", (await rowsOf(page)).length === before);
 
@@ -156,12 +167,12 @@ console.log("\nDesktop — default settings");
 	await page.click("#open");
 	await page.waitForTimeout(200);
 	const scrollBefore = await page.$eval("#note-scroll", (e) => e.scrollTop);
-	const target = await page.$$eval(".subtle-toc-item", (els) => {
+	const target = await page.$$eval(".subtle-toc-root .subtle-toc-item", (els) => {
 		const i = els.findIndex((e) => e.textContent.trim() === "Changelog");
 		return i;
 	});
 	await page.$$eval(
-		".subtle-toc-item",
+		".subtle-toc-root .subtle-toc-item",
 		(els, i) => els[i].dispatchEvent(new MouseEvent("click", { bubbles: true })),
 		target,
 	);
@@ -170,7 +181,7 @@ console.log("\nDesktop — default settings");
 	check("clicking a row scrolls the note", scrollAfter > scrollBefore, `${scrollBefore} -> ${scrollAfter}`);
 
 	const activeText = await page
-		.$eval(".subtle-toc-item.is-active", (e) => e.textContent.trim())
+		.$eval(".subtle-toc-root .subtle-toc-item.is-active", (e) => e.textContent.trim())
 		.catch(() => null);
 	check("an active row is tracked after scrolling", activeText !== null, `active=${activeText}`);
 
@@ -244,7 +255,7 @@ console.log("\nDesktop — content toggles");
 	);
 	await page.click("#open");
 	await page.waitForTimeout(200);
-	await page.$$eval(".subtle-toc-tab", (els) => {
+	await page.$$eval(".subtle-toc-root .subtle-toc-tab", (els) => {
 		const tasks = els.find((e) => /Tasks/.test(e.textContent));
 		tasks.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 	});
@@ -323,7 +334,7 @@ console.log("\nPhone");
 	check("close button is shown in the sheet", sheet.closeDisplay !== "none");
 	check("touch rows meet the 44px minimum", sheet.rowH >= 44, `h=${sheet.rowH}`);
 
-	const twisties = await page.$$eval(".subtle-toc-item", (els) =>
+	const twisties = await page.$$eval(".subtle-toc-root .subtle-toc-item", (els) =>
 		els.map((e) => ({
 			foldable: e.classList.contains("is-foldable"),
 			opacity: parseFloat(getComputedStyle(e.querySelector(".subtle-toc-twisty")).opacity),
@@ -349,7 +360,7 @@ console.log("\nPhone");
 	// A tap on a row should navigate and dismiss.
 	await page.click("#header-actions .view-action");
 	await page.waitForTimeout(400);
-	await page.$$eval(".subtle-toc-item", (els) => {
+	await page.$$eval(".subtle-toc-root .subtle-toc-item", (els) => {
 		const t = els.find((e) => e.textContent.trim() === "Risks");
 		t.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 	});
@@ -687,6 +698,201 @@ console.log("\nHeader button: never");
 			});
 		}
 	}
+
+	await page.close();
+}
+
+/* ------------------------------------------------------------ sidebar view */
+
+/**
+ * The panel is mounted in the page from the start, next to the overlay, so
+ * every assertion above also proves the two surfaces coexist. These are about
+ * the panel itself: that it renders the same tree, and that it drives the same
+ * behaviours, rather than a second implementation that looks similar today.
+ */
+{
+	const page = await newPage();
+
+	await page.click("#open");
+	await page.waitForTimeout(300);
+
+	const popover = await rowsOf(page);
+	const panel = await panelRowsOf(page);
+	check(
+		"the panel renders the same rows as the popover, in order",
+		panel.length > 0 &&
+			panel.length === popover.length &&
+			panel.every((r, i) => r.text === popover[i].text && r.kind === popover[i].kind),
+		`panel=${panel.length} popover=${popover.length} ` +
+			panel
+				.filter((r, i) => !popover[i] || r.text !== popover[i].text)
+				.map((r) => r.text)
+				.join(", "),
+	);
+	check(
+		"the panel is a second surface, not a second overlay",
+		(await page.$$eval(".subtle-toc-root", (e) => e.length)) === 1,
+	);
+	check(
+		"both surfaces are on screen at once",
+		(await page.$eval(".subtle-toc-popover", (e) => getComputedStyle(e).opacity)) === "1" &&
+			(await page.$eval(".subtle-toc-sidebar", (e) => e.clientHeight)) > 100,
+	);
+
+	// Same settings, same rows: the equality above must not be a coincidence of
+	// the default configuration.
+	await setSelect(page, "listItems", "all");
+	await setCheck(page, "allStatuses", true);
+	await setCheck(page, "showCallouts", true);
+	await page.click("#open");
+	await page.waitForTimeout(300);
+	const widePopover = await rowsOf(page);
+	const widePanel = await panelRowsOf(page);
+	check(
+		"with every content setting on, the two surfaces still show the same rows",
+		widePanel.length > 20 &&
+			widePanel.length === widePopover.length &&
+			widePanel.every((r, i) => r.text === widePopover[i].text),
+		`panel=${widePanel.length} popover=${widePopover.length}`,
+	);
+
+	// Folding, in the panel, with the popover's own classes.
+	const beforeFold = (await panelRowsOf(page)).length;
+	await page.click(".subtle-toc-sidebar .subtle-toc-item.is-foldable .subtle-toc-twisty");
+	await page.waitForTimeout(200);
+	const folded = (await panelRowsOf(page)).length;
+	check("folding in the panel hides a subtree", folded < beforeFold, `${beforeFold} -> ${folded}`);
+	await page.click(".subtle-toc-sidebar .subtle-toc-item.is-collapsed .subtle-toc-twisty");
+	await page.waitForTimeout(200);
+	check(
+		"unfolding in the panel restores it",
+		(await panelRowsOf(page)).length === beforeFold,
+	);
+
+	// The active row tracks the note's scroll position in the panel too.
+	await page.$eval("#note-scroll", (e) => (e.scrollTop = 0));
+	await page.waitForTimeout(300);
+	await page.$eval("#note-scroll", (e) => (e.scrollTop = e.scrollHeight * 0.75));
+	await page.waitForTimeout(400);
+	const activePanel = await page.$$eval(".subtle-toc-sidebar .subtle-toc-item.is-active", (els) =>
+		els.map((e) => e.querySelector(".subtle-toc-item-text")?.textContent?.trim() ?? ""),
+	);
+	const activePopover = await page.$$eval(".subtle-toc-root .subtle-toc-item.is-active", (els) =>
+		els.map((e) => e.querySelector(".subtle-toc-item-text")?.textContent?.trim() ?? ""),
+	);
+	check(
+		"the panel tracks the active heading",
+		activePanel.length === 1 && activePanel[0] === activePopover[0],
+		`panel=[${activePanel}] popover=[${activePopover}]`,
+	);
+
+	// Clicking a panel row navigates the note.
+	await page.$eval("#note-scroll", (e) => (e.scrollTop = 0));
+	await page.waitForTimeout(250);
+	const beforeNav = await page.$eval("#note-scroll", (e) => e.scrollTop);
+	await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (els) => {
+		const row = els.find((e) => e.textContent.trim() === "Changelog");
+		row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	});
+	await page.waitForTimeout(700);
+	const afterNav = await page.$eval("#note-scroll", (e) => e.scrollTop);
+	check("clicking a panel row scrolls the note", afterNav > beforeNav, `${beforeNav} -> ${afterNav}`);
+
+	await page.close();
+}
+
+/* ---------------------------------------------- sidebar view: completion -- */
+
+{
+	const page = await newPage();
+	await page.evaluate(() => {
+		window.sim.settings.showTaskCheckboxes = true;
+		window.sim.rebuild();
+	});
+	await page.waitForTimeout(300);
+
+	const strays = await page.$$eval(".subtle-toc-sidebar .subtle-toc-item", (els) =>
+		els.filter((e) => e.querySelector(".subtle-toc-task-check.is-actionable")).map((e) => e.textContent.trim()),
+	);
+	check("the panel offers open tasks a checkbox", strays.length > 0, `${strays.length}`);
+
+	const doneBefore = await page.$$eval(".subtle-toc-sidebar .subtle-toc-item.is-done", (e) => e.length);
+	await page.$$eval(".subtle-toc-sidebar .subtle-toc-task-check.is-actionable", (els, i) =>
+		els[i].dispatchEvent(new MouseEvent("click", { bubbles: true })), 0);
+	// Read the strike before the metadata cache catches up (it lands ~150ms
+	// later in the harness, as it does in Obsidian): this is the window the
+	// completed-task bridge exists for, and the row has to stay put through it.
+	await page.waitForTimeout(60);
+	const state = await page.evaluate(() => {
+		const row = document.querySelector(".subtle-toc-sidebar .subtle-toc-item.is-done");
+		const box = row?.querySelector(".subtle-toc-task-check");
+		return {
+			done: document.querySelectorAll(".subtle-toc-sidebar .subtle-toc-item.is-done").length,
+			text: row?.querySelector(".subtle-toc-item-text")?.textContent?.trim() ?? "",
+			checked: box?.getAttribute("aria-checked") ?? null,
+			note: window.sim.plugin().noteView.getViewData().includes("- [x]"),
+		};
+	});
+	check(
+		"completing a task from the panel strikes the row",
+		state.done === doneBefore + 1,
+		`done=${state.done} text=${state.text}`,
+	);
+	check("the completion is announced to assistive tech", state.checked === "true", `${state.checked}`);
+	check("and it is written to the note", state.note);
+
+	// The cache catches up with the edit a moment later; the completed task must
+	// then drop out of the list on that refresh, without a rebuild.
+	await page.waitForTimeout(400);
+	const afterSync = await panelRowsOf(page);
+	check(
+		"the completed task leaves the list once the note is re-read",
+		!afterSync.some((r) => r.cls.includes("is-done")) && !afterSync.some((r) => r.text === state.text),
+		afterSync.map((r) => r.text).join(", "),
+	);
+
+	await page.close();
+}
+
+/* ------------------------------------------- sidebar view: empty states --- */
+
+{
+	const page = await newPage();
+	await page.evaluate(() => window.sim.setNoteView("none"));
+	await page.waitForTimeout(250);
+	const none = await page.evaluate(() => ({
+		rows: document.querySelectorAll(".subtle-toc-sidebar .subtle-toc-item").length,
+		msg: document.querySelector(".subtle-toc-sidebar .subtle-toc-empty-msg")?.textContent ?? "",
+	}));
+	check("no note open: the panel says so", /no note is open/i.test(none.msg), none.msg);
+	check("no note open: no rows are rendered", none.rows === 0, `${none.rows}`);
+
+	await page.evaluate(() => window.sim.setNoteView("prose"));
+	await page.waitForTimeout(250);
+	const prose = await page.evaluate(
+		() => document.querySelector(".subtle-toc-sidebar .subtle-toc-empty-msg")?.textContent ?? "",
+	);
+	check("a note with nothing to outline: the panel says that instead", /nothing to outline/i.test(prose), prose);
+
+	await page.evaluate(() => window.sim.setNoteView("note"));
+	await page.waitForTimeout(250);
+	check(
+		"and it comes back when a note with content is open again",
+		(await panelRowsOf(page)).length > 0,
+	);
+
+	// The core panes are not touched: the panel is a tab beside them.
+	const untouched = await page.evaluate(() => ({
+		note: !!document.querySelector("#note-content"),
+		dock: !!document.querySelector(".dock-title"),
+		dockVisible: getComputedStyle(document.querySelector(".dock-title")).display !== "none",
+		hidden: document.querySelectorAll('[style*="display: none"]').length,
+	}));
+	check(
+		"the plugin leaves the surrounding panes alone",
+		untouched.note && untouched.dock && untouched.dockVisible && untouched.hidden === 0,
+		JSON.stringify(untouched),
+	);
 
 	await page.close();
 }

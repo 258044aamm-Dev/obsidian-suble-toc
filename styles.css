@@ -276,16 +276,20 @@
 }
 
 /* Unified mode renders a single list, so the tabs would select nothing. The
-   bar itself survives in sheet mode, where it carries the close button. */
-.subtle-toc-root.is-unified .subtle-toc-tab {
+   bar itself survives in sheet mode, where it carries the close button.
+
+   These four rules are keyed on the *surface host* rather than on
+   .subtle-toc-root, because a second surface hosts the same tree: the sidebar
+   panel puts them on its own container. */
+.subtle-toc-surface-host.is-unified .subtle-toc-tab {
 	display: none;
 }
 
-.subtle-toc-root.is-unified:not(.is-sheet) .subtle-toc-tabs {
+.subtle-toc-surface-host.is-unified:not(.is-sheet) .subtle-toc-tabs {
 	display: none;
 }
 
-.subtle-toc-root.is-unified.is-sheet .subtle-toc-tabs {
+.subtle-toc-surface-host.is-unified.is-sheet .subtle-toc-tabs {
 	justify-content: flex-end;
 	padding: 6px 6px 2px;
 }
@@ -410,7 +414,7 @@
 
 /* "Show multiple lines": wrap the full text instead of cutting it — no tooltip
    is set on these rows, since nothing is hidden */
-.subtle-toc-root.is-multiline .subtle-toc-item-text {
+.subtle-toc-surface-host.is-multiline .subtle-toc-item-text {
 	white-space: normal;
 	overflow: visible;
 	text-overflow: clip;
@@ -832,4 +836,19 @@
 /* Comfortable to hit on a phone, where this is the main way around settings. */
 body.is-mobile .subtle-toc-settings-group-header {
 	min-height: 44px;
+}
+
+/* ============================================================================
+   Sidebar view — the same outline in Obsidian's own side panel / drawer
+   ========================================================================== */
+
+/* The view's container. Its rows, tabs and list are styled by the shared rules
+   above; this only gives the panel a height to work in, because the list has to
+   scroll inside the panel rather than growing it. */
+.subtle-toc-sidebar {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	padding: 2px 0 8px;
 }

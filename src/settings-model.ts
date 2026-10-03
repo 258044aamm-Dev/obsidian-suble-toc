@@ -7,6 +7,7 @@ import {
 	TocOutlineMode,
 	TocShow,
 	TocSide,
+	TocSidebarMode,
 	TocTrigger,
 } from "./types";
 
@@ -62,7 +63,10 @@ type DirectControlKey =
 	| "smoothScroll"
 	| "scrollToHeadingOnHover"
 	| "headerButton"
-	| "hideMinimapOnPhone";
+	| "hideMinimapOnPhone"
+	| "sidebarMode"
+	| "sidebarSide"
+	| "sidebarCollapseOnTap";
 
 /** `taskStatuses` is one array rendered as eight independent toggles. */
 type StatusControlKey = `status:${TaskStatusKey}`;
@@ -105,6 +109,9 @@ export const SAVE_MODE: Record<DirectControlKey, SaveMode> = {
 	scrollToHeadingOnHover: "save",
 	headerButton: "refresh",
 	hideMinimapOnPhone: "refresh",
+	sidebarMode: "refresh",
+	sidebarSide: "refresh",
+	sidebarCollapseOnTap: "refresh",
 };
 
 /** Controls driven by a slider, whose writes arrive one per step while dragging. */
@@ -134,6 +141,8 @@ const ENUMS: Partial<Record<DirectControlKey, readonly string[]>> = {
 	side: ["right", "left"],
 	openTrigger: ["hover", "click"],
 	headerButton: ["auto", "always", "never"],
+	sidebarMode: ["off", "armed", "open"],
+	sidebarSide: ["right", "left"],
 };
 
 /** Inclusive bounds for each slider, matching the ranges the UI offers. */
@@ -215,6 +224,12 @@ export function writeControl(
 		case "headerButton":
 			settings.headerButton = value as TocHeaderButton;
 			break;
+		case "sidebarMode":
+			settings.sidebarMode = value as TocSidebarMode;
+			break;
+		case "sidebarSide":
+			settings.sidebarSide = value as TocSide;
+			break;
 
 		case "showCallouts":
 		case "stripMarkdown":
@@ -227,6 +242,7 @@ export function writeControl(
 		case "smoothScroll":
 		case "scrollToHeadingOnHover":
 		case "hideMinimapOnPhone":
+		case "sidebarCollapseOnTap":
 			if (typeof value !== "boolean") return null;
 			settings[key] = value;
 			break;

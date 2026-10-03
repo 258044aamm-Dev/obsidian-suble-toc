@@ -1,16 +1,37 @@
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, SubtleTocSettings } from "./types";
 import { TocOverlay } from "./overlay";
+import { SubtleTocSidebarView } from "./sidebar";
+import { VIEW_TYPE_SUBTLE_TOC, openSidebar, toggleSidebar } from "./sidebar-mode";
 import { SubtleTocSettingTab } from "./settings";
 
 export default class SubtleTocPlugin extends Plugin {
 	settings!: SubtleTocSettings;
 	private overlay: TocOverlay | null = null;
+	/**
+	 * The most recent note view.
+	 *
+	 * The sidebar/drawer takes focus when it is used, and
+	 * `getActiveViewOfType(MarkdownView)` is then null — a sidebar that asked
+	 * the workspace for "the active note" would be empty exactly when it is
+	 * tapped. The overlay can ask directly, because it only ever lives inside a
+	 * note.
+	 */
+	private lastNoteView: MarkdownView | null = null;
+
+	/** The note the sidebar should describe. */
+	get noteView(): MarkdownView | null {
+		return this.lastNoteView ?? this.app.workspace.getActiveViewOfType(MarkdownView);
+	}
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
 		this.addSettingTab(new SubtleTocSettingTab(this.app, this));
+
+		// Must happen in onload: a workspace with the view already open rebuilds
+		// it from its saved state at startup, and an unregistered type is dropped.
+		this.registerView(VIEW_TYPE_SUBTLE_TOC, (leaf) => new SubtleTocSidebarView(leaf, this));
 
 		this.registerEvent(
 			this.app.workspace.on("active-leaf-change", () => this.sync()),
@@ -31,6 +52,19 @@ export default class SubtleTocPlugin extends Plugin {
 			name: "Toggle TOC popover",
 			callback: () => this.overlay?.toggle(),
 		});
+		// The deliberate way in. The note-header button keeps toggling the
+		// popover: silently repointing an existing affordance would be a
+		// surprise, and on desktop the dock's own tab is right there.
+		this.addCommand({
+			id: "open-toc-sidebar",
+			name: "Open in sidebar",
+			callback: () => void openSidebar(this),
+		});
+		this.addCommand({
+			id: "toggle-toc-sidebar",
+			name: "Toggle sidebar view",
+			callback: () => void toggleSidebar(this),
+		});
 
 		this.app.workspace.onLayoutReady(() => this.sync());
 	}
@@ -43,6 +77,13 @@ export default class SubtleTocPlugin extends Plugin {
 	private sync(): void {
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 
+		if (view) this.lastNoteView = view;
+		// The tracked note can be closed while the sidebar holds focus, and a
+		// detached view still answers getViewData() with its last text.
+		else if (this.lastNoteView && !this.noteIsOpen(this.lastNoteView)) {
+			this.lastNoteView = null;
+		}
+
 		if (this.overlay && this.overlay.view !== view) {
 			this.teardownOverlay();
 		}
@@ -54,6 +95,11 @@ export default class SubtleTocPlugin extends Plugin {
 			this.overlay.mount();
 		}
 		this.overlay.refresh();
+	}
+
+	/** Whether a tracked note view is still one of the workspace's markdown leaves. */
+	private noteIsOpen(view: MarkdownView): boolean {
+		return this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view === view);
 	}
 
 	private teardownOverlay(): void {
@@ -79,5 +125,9 @@ export default class SubtleTocPlugin extends Plugin {
 	async saveAndRefresh(): Promise<void> {
 		await this.saveSettings();
 		this.rebuildOverlay();
+		// The panel is a second surface onto the same settings; both follow.
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_SUBTLE_TOC)) {
+			if (leaf.view instanceof SubtleTocSidebarView) leaf.view.refresh();
+		}
 	}
 }

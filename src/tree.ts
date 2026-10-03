@@ -376,6 +376,9 @@ export class OutlineTreeRenderer {
 	}
 
 	private emptyMessage(): string {
+		// The overlay never renders this (it mounts on a note and hides when
+		// empty); the sidebar panel does, and "no note" is not "no headings".
+		if (!this.view) return "No note is open.";
 		if (!this.unified && this.activeTab === "tasks") return "No open tasks in this note.";
 		if (!this.unified) return "No headings in this note.";
 		return "Nothing to outline in this note.";

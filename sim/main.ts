@@ -2,6 +2,7 @@ import { installDomHelpers, App, Platform, setPlatform, TFile } from "./obsidian
 import { MockEditorView } from "./cm-mock";
 import { parseNote } from "./parse";
 import { TocOverlay } from "../src/overlay";
+import { SubtleTocSidebarView } from "../src/sidebar";
 import { DEFAULT_SETTINGS, SubtleTocSettings } from "../src/types";
 
 installDomHelpers();
@@ -72,8 +73,8 @@ const contentEl = document.getElementById("note-content") as HTMLElement;
 const scrollEl = document.getElementById("note-scroll") as HTMLElement;
 const linesEl = document.getElementById("note-lines") as HTMLElement;
 
-const lineEls: HTMLElement[] = noteLines.map((raw) => {
-	const el = document.createElement("div");
+/** Paint one document line the way the harness shows it. */
+function paintLine(el: HTMLElement, raw: string): void {
 	el.className = "cm-line";
 	const heading = /^(#{1,6})\s+(.*)$/.exec(raw);
 	if (heading) {
@@ -88,6 +89,11 @@ const lineEls: HTMLElement[] = noteLines.map((raw) => {
 	} else {
 		el.textContent = raw || "\u00a0";
 	}
+}
+
+const lineEls: HTMLElement[] = noteLines.map((raw) => {
+	const el = document.createElement("div");
+	paintLine(el, raw);
 	linesEl.appendChild(el);
 	return el;
 });
@@ -103,14 +109,49 @@ const file = new TFile("Quarterly review.md");
 
 const headerActionsEl = document.getElementById("header-actions") as HTMLElement;
 
+/**
+ * Re-parse and hand the new cache over, as Obsidian does — *after a beat*, not
+ * inside the edit. The delay is the whole reason the renderer keeps a
+ * completed-task bridge: for those ~150ms the file says `[x]` while the cache
+ * still says `[ ]`, and a list that trusted only the cache would either drop
+ * the row instantly or resurrect it.
+ */
+function reparse(): void {
+	window.setTimeout(() => {
+		app.metadataCache.cache = parseNote(noteLines.join("\n"));
+		app.metadataCache.trigger("changed", file);
+	}, 150);
+}
+
+const editor = {
+	cm,
+	getLine: (n: number) => noteLines[n] ?? "",
+	lineCount: () => noteLines.length,
+	replaceRange(
+		text: string,
+		from: { line: number; ch: number },
+		to?: { line: number; ch: number },
+	) {
+		const line = noteLines[from.line] ?? "";
+		const endCh = to?.ch ?? from.ch;
+		noteLines[from.line] = line.slice(0, from.ch) + text + line.slice(endCh);
+		paintLine(lineEls[from.line], noteLines[from.line]);
+		reparse();
+	},
+	setValue(value: string) {
+		noteLines.length = 0;
+		noteLines.push(...value.split("\n"));
+	},
+};
+
 const view = {
 	app,
 	file,
 	contentEl,
-	editor: { cm, getLine: (n: number) => noteLines[n] },
+	editor,
 	currentMode: {},
 	getMode: () => "source",
-	getViewData: () => PADDED,
+	getViewData: () => noteLines.join("\n"),
 	addAction(_icon: string, title: string, callback: () => void) {
 		const btn = document.createElement("div");
 		btn.className = "view-action";
@@ -129,16 +170,41 @@ const view = {
 
 const settings: SubtleTocSettings = { ...DEFAULT_SETTINGS };
 
-const plugin = { app, settings } as any;
+const plugin = {
+	app,
+	settings,
+	/** What main.ts keeps for the sidebar: the last note view it saw. */
+	noteView: view,
+} as any;
 
 let overlay: TocOverlay | null = null;
+let sidebar: SubtleTocSidebarView | null = null;
+
+const dockEl = document.getElementById("dock") as HTMLElement;
+const dockBodyEl = document.getElementById("dock-body") as HTMLElement;
+
+/**
+ * The sidebar view, driven exactly the way Obsidian drives it: construct with a
+ * leaf, hand it a container, call onOpen(). `noteView` is what the plugin's
+ * tracker supplies — the panel never asks the workspace for the active note,
+ * because when it has focus that answer is null.
+ */
+function rebuildSidebar(): void {
+	sidebar?.unload();
+	dockBodyEl.empty();
+	sidebar = new SubtleTocSidebarView({ app } as never, plugin);
+	sidebar.onOpen();
+	dockBodyEl.appendChild(sidebar.containerEl);
+	sidebar.refresh();
+	report();
+}
 
 function rebuild(): void {
 	overlay?.unmount();
 	overlay = new TocOverlay(plugin, view);
 	overlay.mount();
 	overlay.refresh();
-	report();
+	rebuildSidebar();
 }
 
 /* ---- controls ------------------------------------------------------------ */
@@ -207,10 +273,11 @@ function report(): void {
 			}
 		}
 	});
+	const sideRows = dockBodyEl.querySelectorAll(".subtle-toc-item").length;
 	const parts = Object.entries(kinds).map(([k, n]) => `${k}: ${n}`);
 	out.textContent =
 		`platform: ${Platform.isPhone ? "phone" : Platform.isTablet ? "tablet" : "desktop"} · ` +
-		`rows: ${rows.length} · dashes: ${dashes.length}` +
+		`rows: ${rows.length} · dashes: ${dashes.length} · sidebar rows: ${sideRows}` +
 		(parts.length ? ` · ${parts.join(", ")}` : "");
 }
 
@@ -221,4 +288,35 @@ setDevice("desktop");
 report();
 
 // Expose for console poking during development.
-(window as any).sim = { overlay: () => overlay, settings, rebuild, setDevice, report };
+/**
+ * Point the two surfaces at a different note, the way switching files would.
+ * "none" is the drawer-has-focus case: no note view at all.
+ */
+function setNoteView(mode: "note" | "none" | "prose"): void {
+	if (mode === "note") {
+		plugin.noteView = view;
+		app.metadataCache.cache = cache;
+	} else if (mode === "none") {
+		plugin.noteView = null;
+	} else {
+		plugin.noteView = {
+			...view,
+			file: new TFile("Empty note.md"),
+			getViewData: () => "Just a paragraph, no headings and no tasks.\n",
+		};
+		app.metadataCache.cache = parseNote("Just a paragraph, no headings and no tasks.\n");
+	}
+	rebuildSidebar();
+	report();
+}
+
+(window as any).sim = {
+	overlay: () => overlay,
+	sidebar: () => sidebar,
+	plugin: () => plugin,
+	settings,
+	rebuild,
+	setDevice,
+	setNoteView,
+	report,
+};

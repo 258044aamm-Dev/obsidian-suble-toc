@@ -52,6 +52,8 @@ export type TocOutlineMode = "unified" | "tabs";
 export type TocListItems = "none" | "top" | "all";
 /** When to add the note-header button. */
 export type TocHeaderButton = "auto" | "always" | "never";
+/** Whether the sidebar/drawer view is placed automatically. */
+export type TocSidebarMode = "off" | "armed" | "open";
 
 export interface SubtleTocSettings {
 	/** Which content to surface: headings, open tasks, or both. */
@@ -110,6 +112,14 @@ export interface SubtleTocSettings {
 
 	/** Add a button to the note header that opens the outline. */
 	headerButton: TocHeaderButton;
+	/** Show the outline in Obsidian's own side panel (desktop) / drawer
+	 *  (mobile) as well as, or instead of, the floating overlay. */
+	sidebarMode: TocSidebarMode;
+	/** Which dock the sidebar view lives in. */
+	sidebarSide: TocSide;
+	/** Phones only: collapse the drawer after a row is tapped, so the note
+	 *  that was just scrolled to is actually visible. */
+	sidebarCollapseOnTap: boolean;
 	/** Hide the edge minimap on phones, where it is too narrow to tap. */
 	hideMinimapOnPhone: boolean;
 }
@@ -145,4 +155,10 @@ export const DEFAULT_SETTINGS: SubtleTocSettings = {
 
 	headerButton: "auto",
 	hideMinimapOnPhone: true,
+
+	// The view is registered and can be opened at any time (command, or the
+	// dock's own tab); `off` only means the plugin never places it by itself.
+	sidebarMode: "off",
+	sidebarSide: "right",
+	sidebarCollapseOnTap: true,
 };

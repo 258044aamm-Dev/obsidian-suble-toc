@@ -301,6 +301,9 @@ describe("readControl / writeControl", () => {
 			["scrollToHeadingOnHover", true],
 			["headerButton", "never"],
 			["hideMinimapOnPhone", false],
+			["sidebarMode", "armed"],
+			["sidebarSide", "left"],
+			["sidebarCollapseOnTap", false],
 		];
 
 		for (const [key, value] of cases) {
@@ -351,6 +354,9 @@ describe("readControl / writeControl", () => {
 		expect(writeControl(settings, "showMinimap", "yes")).toBeNull();
 		expect(writeControl(settings, "popoverWidth", Number.NaN)).toBeNull();
 		expect(writeControl(settings, "status:todo", "true")).toBeNull();
+		expect(writeControl(settings, "sidebarMode", "sometimes")).toBeNull();
+		expect(writeControl(settings, "sidebarSide", 1)).toBeNull();
+		expect(writeControl(settings, "sidebarCollapseOnTap", "yes")).toBeNull();
 
 		expect(settings).toEqual(before);
 
@@ -449,8 +455,30 @@ describe("collapse state", () => {
 	});
 });
 
+describe("sidebar keys", () => {
+	it("ships the panel switched off, on the right, closing the drawer on tap", () => {
+		// `off` is the whole reason 0.8.0 changes nothing for anyone who does not
+		// ask for the panel: the view is registered and reachable from its tab
+		// and the command, but the plugin never places it. The phone default is
+		// the opposite -- once the panel is being read on a phone, tapping a row
+		// has to get out of the way.
+		expect(DEFAULT_SETTINGS.sidebarMode).toBe("off");
+		expect(DEFAULT_SETTINGS.sidebarSide).toBe("right");
+		expect(DEFAULT_SETTINGS.sidebarCollapseOnTap).toBe(true);
+	});
+
+	it("rebuilds both surfaces when the panel's placement changes", () => {
+		// These are read when the view is armed or opened, and the panel is
+		// already up when the user changes them, so `save` alone would leave the
+		// old placement on screen.
+		expect(SAVE_MODE.sidebarMode).toBe("refresh");
+		expect(SAVE_MODE.sidebarSide).toBe("refresh");
+		expect(SAVE_MODE.sidebarCollapseOnTap).toBe("refresh");
+	});
+});
+
 describe("defaults are untouched by this change", () => {
-	it("still ships the same 26 keys with the same values", () => {
+	it("still ships the same keys with the same values", () => {
 		expect(DEFAULT_SETTINGS).toEqual({
 			show: "both",
 			defaultTab: "headings",
@@ -478,6 +506,10 @@ describe("defaults are untouched by this change", () => {
 			collapsible: true,
 			headerButton: "auto",
 			hideMinimapOnPhone: true,
+			// Added deliberately in 0.8.0, for the sidebar view.
+			sidebarMode: "off",
+			sidebarSide: "right",
+			sidebarCollapseOnTap: true,
 		});
 	});
 });

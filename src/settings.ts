@@ -530,6 +530,36 @@ export class SubtleTocSettingTab extends PluginSettingTab {
 				control: { type: "toggle", key: "smoothScroll" },
 			},
 			{
+				name: "Sidebar outline",
+				desc: "Also show the outline in Obsidian's own side panel (the drawer on a phone). Off means the plugin never places it by itself — the panel is still there to open from its tab or the \"Open in sidebar\" command.",
+				aliases: ["panel", "dock", "drawer", "sidebar", "mobile"],
+				control: {
+					type: "dropdown",
+					key: "sidebarMode",
+					options: {
+						off: "Off",
+						armed: "Keep it in the panel, closed",
+						open: "Open it at startup",
+					},
+				},
+			},
+			{
+				name: "Sidebar side",
+				desc: "Which dock the side-panel outline lives in.",
+				aliases: ["left", "right"],
+				control: {
+					type: "dropdown",
+					key: "sidebarSide",
+					options: { right: "Right", left: "Left" },
+				},
+			},
+			{
+				name: "Close the drawer after a row",
+				desc: "Phones only: collapse the panel after tapping a row, so the heading that was just scrolled to is visible instead of hidden behind the drawer.",
+				aliases: ["phone", "mobile", "tap"],
+				control: { type: "toggle", key: "sidebarCollapseOnTap" },
+			},
+			{
 				name: "Scroll to heading on hover",
 				desc: "Temporarily scroll to a heading while its TOC row is hovered, then return when the pointer leaves. Click the row to navigate normally and stay there.",
 				aliases: ["preview"],
